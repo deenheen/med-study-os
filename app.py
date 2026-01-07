@@ -1,19 +1,20 @@
 import streamlit as st
 import pandas as pd
-import base64
 import numpy as np
 import time
 import google.generativeai as genai
 from pypdf import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
-from streamlit_mic_recorder import mic_recorder
+# from streamlit_mic_recorder import mic_recorder # 마이크 기능은 일단 주석 처리 (필요시 해제)
+import fitz  # PyMuPDF (PDF 렌더링용 필수)
+from PIL import Image # 이미지 처리용
 
 # =========================
 # 1. 초기 설정 및 세션 관리
 # =========================
 st.set_page_config(page_title="Med-Study OS v0.5", layout="wide", page_icon="🩺")
 
-# 상태 변수 초기화 (버튼 상태 기억용)
+# 상태 변수 초기화
 if 'jokbo_done' not in st.session_state: st.session_state.jokbo_done = False
 if 'lecture_done' not in st.session_state: st.session_state.lecture_done = False
 if 'exam_db' not in st.session_state: st.session_state.exam_db = []
@@ -46,30 +47,52 @@ with st.sidebar:
         st.session_state.jokbo_done = False
         st.session_state.lecture_done = False
         st.session_state.exam_embeddings = None
+        st.session_state.pdf_bytes = None
+        st.session_state.pre_analysis = []
         st.rerun()
 
 # --- 함수 정의 ---
 def get_embedding(text):
     if not api_key: return None
     try:
+        # 모델명은 최신 버전에 맞게 수정될 수 있음
         result = genai.embed_content(
             model="models/text-embedding-004",
             content=text,
             task_type="retrieval_document"
         )
         return result['embedding']
-    except:
+    except Exception as e:
+        st.error(f"임베딩 오류: {e}")
         return None
 
 def get_pdf_text(file):
     reader = PdfReader(file)
     return [page.extract_text() or "" for page in reader.pages]
 
-def display_pdf(file_bytes, page_num):
-    base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-    # #page= 숫자 옵션을 사용하여 해당 페이지를 엽니다.
-    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}#page={page_num}" width="100%" height="800" type="application/pdf"></iframe>'
-    st.markdown(pdf_display, unsafe_allow_html=True)
+# [수정됨] PyMuPDF를 사용하여 PDF 페이지를 이미지로 변환해 보여주는 함수
+def display_pdf_as_image(file_bytes, page_num):
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        # page_num은 1부터 시작하므로 인덱스는 -1 해줘야 함
+        page_idx = page_num - 1
+        
+        if 0 <= page_idx < len(doc):
+            page = doc.load_page(page_idx)
+            
+            # 해상도 높이기 (zoom=2) -> 글씨가 선명해짐
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat)
+            
+            # PIL 이미지로 변환
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            
+            # Streamlit 이미지로 출력
+            st.image(img, use_container_width=True)
+        else:
+            st.error("페이지 범위를 벗어났습니다.")
+    except Exception as e:
+        st.error(f"PDF 렌더링 오류: {e}")
 
 # =========================
 # 2. 메인 UI
@@ -87,7 +110,6 @@ with tab1:
         st.subheader("1. 족보 데이터베이스 구축")
         exam_files = st.file_uploader("족보 PDF 업로드", type="pdf", accept_multiple_files=True)
         
-        # 버튼 상태 로직: 학습이 안 끝났을 때만 버튼 보임
         if not st.session_state.jokbo_done:
             if st.button("족보 학습 시작 🚀"):
                 if not api_key:
@@ -100,7 +122,9 @@ with tab1:
                     progress_text = st.empty()
                     bar = st.progress(0)
                     
-                    for f in exam_files:
+                    total_files = len(exam_files)
+                    
+                    for idx, f in enumerate(exam_files):
                         texts = get_pdf_text(f)
                         for i, text in enumerate(texts):
                             if len(text) > 30:
@@ -109,17 +133,16 @@ with tab1:
                                 if emb:
                                     all_exams.append({"info": f"{f.name} p.{i+1}", "text": text})
                                     embeddings.append(emb)
-                                time.sleep(1.0) # 속도 제한
+                                time.sleep(0.5) # API 제한 고려
+                        bar.progress((idx + 1) / total_files)
                     
                     if embeddings:
                         st.session_state.exam_db = all_exams
                         st.session_state.exam_embeddings = np.array(embeddings)
-                        st.session_state.jokbo_done = True # 상태 변경!
-                        st.rerun() # 화면 새로고침 (버튼 바꾸기 위해)
+                        st.session_state.jokbo_done = True
+                        st.rerun()
         else:
-            # 학습이 끝난 경우
             st.success(f"✅ 족보 학습 완료! (총 {len(st.session_state.exam_db)} 페이지 저장됨)")
-            st.info("새로운 족보를 넣으려면 사이드바의 '전체 초기화'를 누르세요.")
 
     # 2. 강의 분석 섹션
     with col2:
@@ -127,8 +150,10 @@ with tab1:
         lec_file = st.file_uploader("오늘 강의 PDF", type="pdf")
         
         if lec_file:
-            st.session_state.pdf_bytes = lec_file.getvalue()
-            # 전체 페이지 수 계산
+            # 파일 바이트 저장 (뷰어용)
+            if st.session_state.pdf_bytes is None:
+                st.session_state.pdf_bytes = lec_file.getvalue()
+                
             reader = PdfReader(lec_file)
             st.session_state.total_pages = len(reader.pages)
             
@@ -144,24 +169,27 @@ with tab1:
                         for i, p_text in enumerate(lec_pages):
                             if len(p_text) < 30: continue
                             
-                            q_emb = genai.embed_content(
-                                model="models/text-embedding-004",
-                                content=p_text,
-                                task_type="retrieval_query"
-                            )['embedding']
+                            try:
+                                q_emb = genai.embed_content(
+                                    model="models/text-embedding-004",
+                                    content=p_text,
+                                    task_type="retrieval_query"
+                                )['embedding']
+                                
+                                sims = cosine_similarity([q_emb], st.session_state.exam_embeddings).flatten()
+                                
+                                if sims.max() > 0.55: # 유사도 기준 살짝 상향
+                                    best_idx = sims.argmax()
+                                    results.append({
+                                        "page": i+1,
+                                        "score": sims.max(),
+                                        "exam_info": st.session_state.exam_db[best_idx]['info'],
+                                        "exam_text": st.session_state.exam_db[best_idx]['text']
+                                    })
+                            except Exception as e:
+                                print(f"Error on page {i}: {e}")
                             
-                            sims = cosine_similarity([q_emb], st.session_state.exam_embeddings).flatten()
-                            
-                            if sims.max() > 0.5: # 유사도 기준
-                                best_idx = sims.argmax()
-                                results.append({
-                                    "page": i+1,
-                                    "score": sims.max(),
-                                    "exam_info": st.session_state.exam_db[best_idx]['info'],
-                                    "exam_text": st.session_state.exam_db[best_idx]['text']
-                                })
-                            
-                            time.sleep(1.0)
+                            time.sleep(0.5)
                             bar2.progress((i+1)/len(lec_pages))
                         
                         st.session_state.pre_analysis = results
@@ -175,44 +203,33 @@ with tab1:
 with tab2:
     if st.session_state.pdf_bytes and st.session_state.total_pages > 0:
         
-        # 1. 페이지 슬라이더 (여기서 페이지를 조작)
+        # 1. 페이지 슬라이더
         page_num = st.slider("페이지 이동", 1, st.session_state.total_pages, 1)
         st.caption(f"총 {st.session_state.total_pages}페이지 중 {page_num}페이지")
         
-        # 화면 분할 (왼쪽: PDF / 오른쪽: 분석 결과)
-        c_pdf, c_info = st.columns([1.5, 1])
+        # 2. 화면 분할 (왼쪽: PDF 이미지 / 오른쪽: 분석 결과)
+        c_pdf, c_info = st.columns([1.2, 1]) # PDF를 조금 더 넓게
         
         with c_pdf:
-            display_pdf(st.session_state.pdf_bytes, page_num)
+            st.markdown("### 📄 강의록")
+            # [수정됨] 여기에 수정된 이미지 뷰어 함수 적용
+            display_pdf_as_image(st.session_state.pdf_bytes, page_num)
             
         with c_info:
-            st.subheader(f"📄 {page_num}p 분석 리포트")
+            st.markdown(f"### 📊 분석 리포트")
             
-            # 현재 페이지에 해당하는 분석 결과 찾기
             matches = [r for r in st.session_state.pre_analysis if r['page'] == page_num]
             
             if matches:
-                st.toast(f"{page_num}페이지에서 족보 내용을 발견했습니다!", icon="🔥")
+                st.info(f"💡 이 페이지에서 **{len(matches)}개**의 족보 연관 내용을 찾았습니다!")
                 
                 for match in matches:
-                    # 카드 형태로 보여주기
-                    with st.container(border=True):
-                        st.markdown(f"### 🔥 기출 적중 ({match['score']*100:.0f}%)")
-                        st.markdown(f"**출처:** `{match['exam_info']}`")
-                        
-                        # 형광펜 효과처럼 배경색 입히기
+                    with st.expander(f"🔥 기출 적중 ({match['score']*100:.0f}%) - {match['exam_info']}", expanded=True):
                         st.markdown(
                             f"""
-                            <div style="background-color: #fff9c4; padding: 10px; border-radius: 5px;">
-                                <b>관련 족보 내용:</b><br>
-                                {match['exam_text'][:200]}...
+                            <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; color: #856404;">
+                                <b>📌 관련 족보 내용:</b><br>
+                                {match['exam_text'][:300]}...
                             </div>
                             """, 
-                            unsafe_allow_html=True
-                        )
-            else:
-                st.info("이 페이지와 직접적으로 관련된 족보 내용은 발견되지 않았습니다.")
-                st.markdown("Try: 다음 페이지로 넘겨보세요!")
-                
-    else:
-        st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
+                            unsafe_allow
