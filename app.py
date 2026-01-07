@@ -232,4 +232,12 @@ with tab2:
                                 {match['exam_text'][:300]}...
                             </div>
                             """, 
-                            unsafe_allow
+                            unsafe_allow_html=True
+                        )  # <--- 여기 이 괄호 ')'가 빠져 있는지 확인하세요!
+            else:
+                st.write("---")
+                st.write("✅ 이 페이지는 특별히 감지된 족보 내용이 없습니다.")
+                st.write("가볍게 읽고 넘어가셔도 좋습니다.")
+
+    else:
+        st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
