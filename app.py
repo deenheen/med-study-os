@@ -85,7 +85,7 @@ def display_pdf_as_image(file_bytes, page_num):
     except Exception as e:
         st.error(f"PDF 렌더링 오류: {e}")
 
-# [New] AI 분석 함수 추가됨
+# [수정됨] 모델 변경(gemini-1.5-flash) 및 상세 에러 출력 추가
 def analyze_connection(lecture_text, jokbo_text):
     if not api_key: return "AI 연결 필요"
     
@@ -94,13 +94,13 @@ def analyze_connection(lecture_text, jokbo_text):
     [강의록 내용]과 [족보(기출) 내용]을 비교하여, 왜 이 족보가 강의록의 이 부분과 관련이 있는지 설명해주세요.
     
     [강의록]
-    {lecture_text[:1000]}
+    {lecture_text[:800]} 
     
     [족보]
-    {jokbo_text[:1000]}
+    {jokbo_text[:800]}
     
     요청사항:
-    1. 두 내용의 공통된 의학적/생물학적 주제가 무엇인지 한 단어로 정의하세요. (예: DNA 복제, 효소 역학 등)
+    1. 두 내용의 공통된 의학적/생물학적 주제가 무엇인지 한 단어로 정의하세요.
     2. 족보 내용이 강의록 공부에 어떻게 도움이 되는지 한 문장으로 요약하세요.
     
     출력 형식:
@@ -108,11 +108,13 @@ def analyze_connection(lecture_text, jokbo_text):
     **분석:** (설명)
     """
     try:
-        model = genai.GenerativeModel("gemini-pro")
+        # 모델명을 최신/경량 모델인 'gemini-1.5-flash'로 변경 (속도 빠름, 에러 적음)
+        model = genai.GenerativeModel("gemini-1.5-flash") 
         response = model.generate_content(prompt)
         return response.text
-    except:
-        return "AI 분석 실패 (API 호출 오류)"
+    except Exception as e:
+        # [중요] 어떤 에러인지 화면에 보이게 수정함
+        return f"오류 발생: {str(e)}"
 
 # =========================
 # 2. 메인 UI
@@ -269,3 +271,4 @@ with tab2:
                 st.write("가볍게 읽고 넘어가셔도 좋습니다.")
     else:
         st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
+
