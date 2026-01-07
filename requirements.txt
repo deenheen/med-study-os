@@ -6,3 +6,4 @@ streamlit-mic-recorder
 google-generativeai
 numpy
 pymupdf
+google-generativeai>=0.7.0
