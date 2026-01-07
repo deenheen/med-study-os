@@ -1,0 +1,7 @@
+streamlit
+pandas
+pypdf
+scikit-learn
+streamlit-mic-recorder
+google-generativeai
+numpy
