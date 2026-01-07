@@ -29,7 +29,17 @@ with st.sidebar:
     if api_key:
         genai.configure(api_key=api_key)
         st.success("✅ AI 연결됨")
-    
+    st.divider()
+    st.markdown("### 🛠 모델 진단")
+    if st.button("내 API로 가능한 모델 보기"):
+        try:
+            st.write("사용 가능한 모델 목록:")
+            # generateContent 기능을 지원하는 모델만 필터링해서 보여줌
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    st.code(m.name) # 예: models/gemini-pro
+        except Exception as e:
+            st.error(f"목록 조회 실패: {e}")
     st.divider()
     st.markdown("### 상태 모니터")
     if st.session_state.jokbo_done:
@@ -270,5 +280,6 @@ with tab2:
                 st.write("가볍게 읽고 넘어가셔도 좋습니다.")
     else:
         st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
+
 
 
