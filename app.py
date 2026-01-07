@@ -11,7 +11,16 @@ from streamlit_mic_recorder import mic_recorder
 # =========================
 # 1. 초기 설정 및 세션 관리
 # =========================
-st.set_page_config(page_title="Med-Study AI (Fixed)", layout="wide", page_icon="🧠")
+st.set_page_config(page_title="Med-Study OS v0.5", layout="wide", page_icon="🩺")
+
+# 상태 변수 초기화 (버튼 상태 기억용)
+if 'jokbo_done' not in st.session_state: st.session_state.jokbo_done = False
+if 'lecture_done' not in st.session_state: st.session_state.lecture_done = False
+if 'exam_db' not in st.session_state: st.session_state.exam_db = []
+if 'exam_embeddings' not in st.session_state: st.session_state.exam_embeddings = None 
+if 'pre_analysis' not in st.session_state: st.session_state.pre_analysis = []
+if 'pdf_bytes' not in st.session_state: st.session_state.pdf_bytes = None
+if 'total_pages' not in st.session_state: st.session_state.total_pages = 0
 
 # 사이드바 설정
 with st.sidebar:
@@ -19,30 +28,37 @@ with st.sidebar:
     api_key = st.text_input("Gemini API Key", type="password")
     if api_key:
         genai.configure(api_key=api_key)
-        st.success("AI 연결 완료!")
+        st.success("✅ AI 연결됨")
+    
+    st.divider()
+    st.markdown("### 상태 모니터")
+    if st.session_state.jokbo_done:
+        st.success("족보 학습 완료")
     else:
-        st.warning("API 키를 입력해주세요.")
+        st.warning("족보 학습 대기 중")
+        
+    if st.session_state.lecture_done:
+        st.success("강의 분석 완료")
+    else:
+        st.warning("강의 분석 대기 중")
+    
+    if st.button("🔄 전체 초기화"):
+        st.session_state.jokbo_done = False
+        st.session_state.lecture_done = False
+        st.session_state.exam_embeddings = None
+        st.rerun()
 
-# 세션 상태 초기화
-if 'pre_analysis' not in st.session_state: st.session_state.pre_analysis = []
-if 'exam_db' not in st.session_state: st.session_state.exam_db = []
-if 'exam_embeddings' not in st.session_state: st.session_state.exam_embeddings = None 
-if 'pdf_bytes' not in st.session_state: st.session_state.pdf_bytes = None
-
-# --- [핵심 기능] Gemini 임베딩 함수 (수정됨: 최신 모델 사용) ---
+# --- 함수 정의 ---
 def get_embedding(text):
     if not api_key: return None
     try:
-        # 모델 변경: embedding-001 -> text-embedding-004 (더 안정적)
         result = genai.embed_content(
             model="models/text-embedding-004",
             content=text,
-            task_type="retrieval_document",
-            title="Med Study"
+            task_type="retrieval_document"
         )
         return result['embedding']
-    except Exception as e:
-        st.error(f"임베딩 오류: {e}")
+    except:
         return None
 
 def get_pdf_text(file):
@@ -51,158 +67,152 @@ def get_pdf_text(file):
 
 def display_pdf(file_bytes, page_num):
     base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}#page={page_num}" width="100%" height="850" type="application/pdf"></iframe>'
+    # #page= 숫자 옵션을 사용하여 해당 페이지를 엽니다.
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}#page={page_num}" width="100%" height="800" type="application/pdf"></iframe>'
     st.markdown(pdf_display, unsafe_allow_html=True)
 
 # =========================
-# 2. 메인 UI 화면 구성
+# 2. 메인 UI
 # =========================
-st.title("🧠 Med-Study OS: Gemini Semantic Search")
-st.caption("AI가 족보를 학습할 때 **속도 제한(1.5초)**을 두어 오류를 방지합니다.")
+st.title("🩺 Med-Study OS: 스마트 뷰어")
 
-tab1, tab2, tab3 = st.tabs(["📂 1. AI 학습 (데이터 준비)", "🎙️ 2. 실시간 수업 (AI 매칭)", "🎯 3. 복습 리포트"])
+tab1, tab2 = st.tabs(["📂 데이터 학습 (준비)", "📖 강의 뷰어 (공부)"])
 
-# --- [Tab 1: 데이터 준비] ---
+# --- [Tab 1: 데이터 학습] ---
 with tab1:
     col1, col2 = st.columns(2)
     
+    # 1. 족보 학습 섹션
     with col1:
-        st.subheader("1. 족보 PDF AI 학습")
-        exam_files = st.file_uploader("족보 파일을 업로드하세요", type="pdf", accept_multiple_files=True)
+        st.subheader("1. 족보 데이터베이스 구축")
+        exam_files = st.file_uploader("족보 PDF 업로드", type="pdf", accept_multiple_files=True)
         
-        if st.button("족보 데이터 임베딩(학습) 시작 🚀"):
-            if not api_key:
-                st.error("API 키를 먼저 입력해주세요!")
-            else:
-                all_exams = []
-                embeddings = []
-                
-                # 진행 상황 표시줄
-                status_text = st.empty()
-                progress_bar = st.progress(0)
-                
-                total_pages = sum([len(PdfReader(f).pages) for f in exam_files])
-                processed_count = 0
+        # 버튼 상태 로직: 학습이 안 끝났을 때만 버튼 보임
+        if not st.session_state.jokbo_done:
+            if st.button("족보 학습 시작 🚀"):
+                if not api_key:
+                    st.error("API 키를 입력하세요.")
+                elif not exam_files:
+                    st.error("파일을 업로드하세요.")
+                else:
+                    all_exams = []
+                    embeddings = []
+                    progress_text = st.empty()
+                    bar = st.progress(0)
+                    
+                    for f in exam_files:
+                        texts = get_pdf_text(f)
+                        for i, text in enumerate(texts):
+                            if len(text) > 30:
+                                progress_text.text(f"학습 중: {f.name} p.{i+1}")
+                                emb = get_embedding(text)
+                                if emb:
+                                    all_exams.append({"info": f"{f.name} p.{i+1}", "text": text})
+                                    embeddings.append(emb)
+                                time.sleep(1.0) # 속도 제한
+                    
+                    if embeddings:
+                        st.session_state.exam_db = all_exams
+                        st.session_state.exam_embeddings = np.array(embeddings)
+                        st.session_state.jokbo_done = True # 상태 변경!
+                        st.rerun() # 화면 새로고침 (버튼 바꾸기 위해)
+        else:
+            # 학습이 끝난 경우
+            st.success(f"✅ 족보 학습 완료! (총 {len(st.session_state.exam_db)} 페이지 저장됨)")
+            st.info("새로운 족보를 넣으려면 사이드바의 '전체 초기화'를 누르세요.")
 
-                for f in exam_files:
-                    texts = get_pdf_text(f)
-                    for i, text in enumerate(texts):
-                        if len(text.strip()) > 30: # 너무 짧은 페이지 무시
-                            status_text.text(f"AI가 읽는 중... {f.name} (p.{i+1}) - 천천히 읽는 중 🐢")
-                            
-                            emb = get_embedding(text) 
-                            if emb:
-                                all_exams.append({"info": f"{f.name} (p.{i+1})", "text": text})
-                                embeddings.append(emb)
-                            
-                            # [핵심 수정] 과부하 방지를 위해 1.5초 휴식
-                            time.sleep(1.5)
-                        
-                        processed_count += 1
-                        progress_bar.progress(min(processed_count / total_pages, 1.0))
-                
-                if embeddings:
-                    st.session_state.exam_db = all_exams
-                    st.session_state.exam_embeddings = np.array(embeddings)
-                    st.success(f"완료! 총 {len(all_exams)}페이지를 학습했습니다. (오류 없이 성공)")
-
+    # 2. 강의 분석 섹션
     with col2:
-        st.subheader("2. 오늘 강의록 매칭 분석")
-        lec_file = st.file_uploader("오늘 수업 PDF", type="pdf")
+        st.subheader("2. 강의록 연결")
+        lec_file = st.file_uploader("오늘 강의 PDF", type="pdf")
         
         if lec_file:
             st.session_state.pdf_bytes = lec_file.getvalue()
+            # 전체 페이지 수 계산
+            reader = PdfReader(lec_file)
+            st.session_state.total_pages = len(reader.pages)
             
-            if st.button("수업 전 AI 단권화 분석"):
-                if st.session_state.exam_embeddings is not None:
-                    lec_pages = get_pdf_text(lec_file)
-                    results = []
-                    
-                    st.info("분석 중입니다... (속도 조절 중)")
-                    progress_bar_lec = st.progress(0)
-                    
-                    for i, p_text in enumerate(lec_pages):
-                        if len(p_text.strip()) < 30: continue
+            if not st.session_state.lecture_done:
+                if st.button("강의록 분석 시작 🔍"):
+                    if not st.session_state.jokbo_done:
+                        st.error("족보 학습을 먼저 완료해주세요!")
+                    else:
+                        lec_pages = [page.extract_text() for page in reader.pages]
+                        results = []
+                        bar2 = st.progress(0)
                         
-                        # 강의 내용 임베딩 (Query)
-                        q_emb = genai.embed_content(
-                            model="models/text-embedding-004", # 모델 변경
-                            content=p_text,
-                            task_type="retrieval_query"
-                        )['embedding']
+                        for i, p_text in enumerate(lec_pages):
+                            if len(p_text) < 30: continue
+                            
+                            q_emb = genai.embed_content(
+                                model="models/text-embedding-004",
+                                content=p_text,
+                                task_type="retrieval_query"
+                            )['embedding']
+                            
+                            sims = cosine_similarity([q_emb], st.session_state.exam_embeddings).flatten()
+                            
+                            if sims.max() > 0.5: # 유사도 기준
+                                best_idx = sims.argmax()
+                                results.append({
+                                    "page": i+1,
+                                    "score": sims.max(),
+                                    "exam_info": st.session_state.exam_db[best_idx]['info'],
+                                    "exam_text": st.session_state.exam_db[best_idx]['text']
+                                })
+                            
+                            time.sleep(1.0)
+                            bar2.progress((i+1)/len(lec_pages))
                         
-                        # 유사도 계산
-                        sims = cosine_similarity([q_emb], st.session_state.exam_embeddings).flatten()
-                        
-                        if sims.max() > 0.5: # 기준점
-                            best_idx = sims.argmax()
-                            results.append({
-                                "page": i+1, 
-                                "score": sims.max(), 
-                                "exam_info": st.session_state.exam_db[best_idx]['info'],
-                                "exam_text": st.session_state.exam_db[best_idx]['text']
-                            })
-                        
-                        # [핵심 수정] 여기도 휴식 시간 추가
-                        time.sleep(1.0)
-                        progress_bar_lec.progress((i + 1) / len(lec_pages))
-                    
-                    st.session_state.pre_analysis = results
-                    st.success(f"분석 완료! {len(results)}개 중요 페이지 발견.")
-                else:
-                    st.error("먼저 왼쪽에서 족보 학습을 완료해주세요.")
+                        st.session_state.pre_analysis = results
+                        st.session_state.lecture_done = True
+                        st.rerun()
+            else:
+                st.success(f"✅ 강의 분석 완료! ({len(st.session_state.pre_analysis)}개 중요 포인트 발견)")
+                st.markdown("👉 **'강의 뷰어' 탭으로 이동하세요.**")
 
-# --- [Tab 2: 실시간 수업] ---
+# --- [Tab 2: 강의 뷰어 (핵심 기능)] ---
 with tab2:
-    if st.session_state.pdf_bytes is None:
-        st.warning("Tab 1에서 강의록을 먼저 업로드해주세요.")
-    else:
-        col_pdf, col_live = st.columns([1.2, 0.8])
+    if st.session_state.pdf_bytes and st.session_state.total_pages > 0:
         
-        with col_pdf:
-            st.subheader("📄 강의록 뷰어")
-            page_selection = st.select_slider("페이지", options=range(1, 51), value=1)
-            display_pdf(st.session_state.pdf_bytes, page_selection)
-
-        with col_live:
-            st.subheader("🎙️ AI 실시간 청취")
-            audio = mic_recorder(start_prompt="👂 듣기 시작", stop_prompt="⏹️ 판단해", key='live_recorder')
+        # 1. 페이지 슬라이더 (여기서 페이지를 조작)
+        page_num = st.slider("페이지 이동", 1, st.session_state.total_pages, 1)
+        st.caption(f"총 {st.session_state.total_pages}페이지 중 {page_num}페이지")
+        
+        # 화면 분할 (왼쪽: PDF / 오른쪽: 분석 결과)
+        c_pdf, c_info = st.columns([1.5, 1])
+        
+        with c_pdf:
+            display_pdf(st.session_state.pdf_bytes, page_num)
             
-            # 테스트용 입력창
-            user_input = st.text_input("또는 직접 입력 (테스트)", "심전도 ST분절 상승")
-
-            if (audio or user_input) and st.session_state.exam_embeddings is not None:
-                target_text = user_input # 실제로는 오디오 변환 텍스트 사용
+        with c_info:
+            st.subheader(f"📄 {page_num}p 분석 리포트")
+            
+            # 현재 페이지에 해당하는 분석 결과 찾기
+            matches = [r for r in st.session_state.pre_analysis if r['page'] == page_num]
+            
+            if matches:
+                st.toast(f"{page_num}페이지에서 족보 내용을 발견했습니다!", icon="🔥")
                 
-                # 실시간 검색 임베딩
-                live_emb = genai.embed_content(
-                    model="models/text-embedding-004", # 모델 변경
-                    content=target_text,
-                    task_type="retrieval_query"
-                )['embedding']
+                for match in matches:
+                    # 카드 형태로 보여주기
+                    with st.container(border=True):
+                        st.markdown(f"### 🔥 기출 적중 ({match['score']*100:.0f}%)")
+                        st.markdown(f"**출처:** `{match['exam_info']}`")
+                        
+                        # 형광펜 효과처럼 배경색 입히기
+                        st.markdown(
+                            f"""
+                            <div style="background-color: #fff9c4; padding: 10px; border-radius: 5px;">
+                                <b>관련 족보 내용:</b><br>
+                                {match['exam_text'][:200]}...
+                            </div>
+                            """, 
+                            unsafe_allow_html=True
+                        )
+            else:
+                st.info("이 페이지와 직접적으로 관련된 족보 내용은 발견되지 않았습니다.")
+                st.markdown("Try: 다음 페이지로 넘겨보세요!")
                 
-                sims_live = cosine_similarity([live_emb], st.session_state.exam_embeddings).flatten()
-                
-                if sims_live.max() > 0.45:
-                    best_hit = sims_live.argmax()
-                    st.toast("🚨 족보 내용 감지!", icon="🔥")
-                    st.markdown(f"**관련 족보:** {st.session_state.exam_db[best_hit]['info']}")
-                    st.info(st.session_state.exam_db[best_hit]['text'][:200] + "...")
-                else:
-                    st.caption("관련 내용 없음")
-
-            st.divider()
-            st.markdown(f"**📍 {page_selection}p 관련 기출**")
-            current_matches = [r for r in st.session_state.pre_analysis if r['page'] == page_selection]
-            if current_matches:
-                for match in current_matches:
-                    st.success(f"{match['exam_info']} (유사도 {match['score']*100:.0f}%)")
-
-# --- [Tab 3: 리포트] ---
-with tab3:
-    if st.session_state.pre_analysis:
-        df = pd.DataFrame(st.session_state.pre_analysis)
-        df['일치도'] = (df['score'] * 100).round(1).astype(str) + '%'
-        st.dataframe(df[['page', '일치도', 'exam_info']])
     else:
-        st.info("데이터가 없습니다.")
+        st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
