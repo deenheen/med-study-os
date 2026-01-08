@@ -7,7 +7,7 @@ from pypdf import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 import fitz  # PyMuPDF
 from PIL import Image
-
+ㅁ
 # =========================
 # 1. 초기 설정 및 세션 관리
 # =========================
@@ -95,7 +95,7 @@ def display_pdf_as_image(file_bytes, page_num):
     except Exception as e:
         st.error(f"PDF 렌더링 오류: {e}")
 
-# [수정됨] 여러 모델 이름을 순서대로 시도하는 '안전형' 함수
+# [최종] 사용자님이 확인한 모델명을 1순위로 적용한 코드
 def analyze_connection(lecture_text, jokbo_text):
     if not api_key: return "AI 연결 필요"
     
@@ -118,28 +118,30 @@ def analyze_connection(lecture_text, jokbo_text):
     **분석:** (설명)
     """
     
-    # 시도할 모델 이름 리스트 (최신 모델부터 구형 모델 순서로)
-    # 라이브러리 버전에 따라 인식하는 이름이 다를 수 있어 여러 개를 다 넣어둠
+    # [핵심] 사용자님이 목록에서 직접 본 그 이름을 맨 위에 넣었습니다.
     candidate_models = [
-        "gemini-1.5-flash",   # 1순위: 가장 빠르고 저렴함
-        "gemini-pro",         # 2순위: 표준 모델
-        "models/gemini-pro",  # 3순위: 구버전 라이브러리용 전체 경로 이름
-        "gemini-1.0-pro"      # 4순위: 특정 버전 명시
+        "models/gemini-2.5-flash",      # 1순위: 방금 목록에서 보신 그 모델!
+        "models/gemini-1.5-flash",      # 2순위: 혹시 1.5였다면 이거
+        "gemini-1.5-flash",             # 3순위: 이름만 있는 버전
+        "models/gemini-2.0-flash-exp",  # 4순위: 최신 실험 버전
+        "models/gemini-pro",            # 5순위: 구관이 명관
+        "gemini-pro"
     ]
 
     last_error = ""
     
     for model_name in candidate_models:
         try:
+            # 모델 생성 시도
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
-            return response.text # 성공하면 바로 결과 반환하고 종료
+            return response.text # 성공하면 바로 리턴!
         except Exception as e:
             last_error = str(e)
-            continue # 실패하면 다음 모델 이름으로 넘어감
+            continue # 실패하면 다음 후보로 넘어감
 
-    # 모든 모델이 다 실패했을 때만 에러 메시지 출력
-    return f"분석 실패: 모든 모델 시도 실패. (마지막 에러: {last_error})"
+    # 모든 후보가 다 실패했을 때만 에러 출력
+    return f"분석 실패.\n시도한 모델들: {candidate_models}\n마지막 에러: {last_error}"
 # =========================
 # 2. 메인 UI
 # =========================
@@ -295,6 +297,7 @@ with tab2:
                 st.write("가볍게 읽고 넘어가셔도 좋습니다.")
     else:
         st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
+
 
 
 
