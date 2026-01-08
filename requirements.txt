@@ -3,7 +3,7 @@ pandas
 pypdf
 scikit-learn
 streamlit-mic-recorder
-google-generativeai
 numpy
 pymupdf
 google-generativeai>=0.8.3
+
