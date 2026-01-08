@@ -11,7 +11,7 @@ from PIL import Image
 # =========================
 # 1. 초기 설정 및 세션 관리
 # =========================
-st.set_page_config(page_title="Med-Study OS v0.5", layout="wide", page_icon="🩺")
+st.set_page_config(page_title="Med-Study OS v0.5 (Light)", layout="wide", page_icon="⚡")
 
 # 상태 변수 초기화
 if 'jokbo_done' not in st.session_state: st.session_state.jokbo_done = False
@@ -24,7 +24,7 @@ if 'total_pages' not in st.session_state: st.session_state.total_pages = 0
 
 # 사이드바 설정
 with st.sidebar:
-    st.title("⚙️ 설정")
+    st.title("⚡ 설정 (Light Ver.)")
     api_key = st.text_input("Gemini API Key", type="password")
     if api_key:
         genai.configure(api_key=api_key)
@@ -84,13 +84,13 @@ def display_pdf_as_image(file_bytes, page_num):
     except Exception as e:
         st.error(f"PDF 렌더링 오류: {e}")
 
-# [핵심] 사용자님이 찾으신 모델을 적용한 분석 함수
+# [속도 개선] 가장 가벼운 모델(1.5 Flash)을 최우선으로 사용
 def analyze_connection(lecture_text, jokbo_text):
     if not api_key: return "AI 연결 필요"
     
     prompt = f"""
-    당신은 의대생의 공부를 돕는 조교입니다.
-    [강의록 내용]과 [족보(기출) 내용]을 비교하여, 왜 이 족보가 강의록의 이 부분과 관련이 있는지 설명해주세요.
+    당신은 의대생 조교입니다.
+    [강의록]과 [족보]의 연결고리를 아주 짧게 설명하세요.
     
     [강의록]
     {lecture_text[:800]} 
@@ -98,22 +98,17 @@ def analyze_connection(lecture_text, jokbo_text):
     [족보]
     {jokbo_text[:800]}
     
-    요청사항:
-    1. 두 내용의 공통된 의학적/생물학적 주제가 무엇인지 한 단어로 정의하세요.
-    2. 족보 내용이 강의록 공부에 어떻게 도움이 되는지 한 문장으로 요약하세요.
-    
-    출력 형식:
-    **핵심 주제:** (주제)
-    **분석:** (설명)
+    형식:
+    **핵심:** (단어)
+    **분석:** (한 줄 요약)
     """
     
-    # 사용자님이 확인하신 모델을 1순위로 넣었습니다!
+    # ⚡ 속도 최적화 모델 리스트 (가벼운 순서)
     candidate_models = [
-        "models/gemini-2.5-flash",      # 1순위 (사용자 확인)
-        "gemini-2.5-flash",             # 2순위 (이름 변형)
-        "models/gemini-1.5-flash",      # 3순위 (대안)
-        "gemini-1.5-flash",
-        "models/gemini-pro",            # 4순위 (기본)
+        "gemini-1.5-flash",         # 1순위: 가장 빠름
+        "models/gemini-1.5-flash",  # 2순위
+        "gemini-1.5-flash-002",     # 3순위: 최신 최적화 버전
+        "gemini-1.0-pro",           # 4순위: 구버전 (가벼움)
         "gemini-pro"
     ]
 
@@ -128,12 +123,12 @@ def analyze_connection(lecture_text, jokbo_text):
             last_error = str(e)
             continue 
 
-    return f"분석 실패.\n시도한 모델들: {candidate_models}\n마지막 에러: {last_error}"
+    return f"분석 실패 (에러: {last_error})"
 
 # =========================
 # 2. 메인 UI
 # =========================
-st.title("🩺 Med-Study OS: 스마트 뷰어")
+st.title("⚡ Med-Study OS: 라이트 버전")
 
 tab1, tab2 = st.tabs(["📂 데이터 학습 (준비)", "📖 강의 뷰어 (공부)"])
 
@@ -168,7 +163,8 @@ with tab1:
                                 if emb:
                                     all_exams.append({"info": f"{f.name} p.{i+1}", "text": text})
                                     embeddings.append(emb)
-                                time.sleep(0.5)
+                                # ⚡ 학습 속도도 높이기 위해 대기 시간 단축 (0.5 -> 0.2)
+                                time.sleep(0.2)
                         bar.progress((idx + 1) / total_files)
                     
                     if embeddings:
@@ -192,7 +188,7 @@ with tab1:
             st.session_state.total_pages = len(reader.pages)
             
             if not st.session_state.lecture_done:
-                if st.button("강의록 분석 시작 🔍"):
+                if st.button("강의록 분석 시작 ⚡"):
                     if not st.session_state.jokbo_done:
                         st.error("족보 학습을 먼저 완료해주세요!")
                     else:
@@ -227,7 +223,9 @@ with tab1:
                             except Exception as e:
                                 print(f"Error page {i}: {e}")
                             
-                            time.sleep(1.0)
+                            # ⚡ [중요] 분석 대기 시간을 1.0초 -> 0.3초로 대폭 단축!
+                            # Flash 모델은 빨라서 이래도 괜찮습니다.
+                            time.sleep(0.3)
                             bar2.progress((i+1)/len(lec_pages))
                         
                         st.session_state.pre_analysis = results
@@ -254,7 +252,7 @@ with tab2:
             matches = [r for r in st.session_state.pre_analysis if r['page'] == page_num]
             
             if matches:
-                st.info(f"💡 이 페이지에서 **{len(matches)}개**의 족보 연관 내용을 찾았습니다!")
+                st.info(f"⚡ {len(matches)}개의 족보 내용을 빠르게 찾았습니다!")
                 for match in matches:
                     with st.expander(f"🔥 기출 적중 ({match['score']*100:.0f}%) - {match['exam_info']}", expanded=True):
                         
