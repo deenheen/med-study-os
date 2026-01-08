@@ -7,7 +7,7 @@ from pypdf import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 import fitz  # PyMuPDF
 from PIL import Image
-ㅁ
+
 # =========================
 # 1. 초기 설정 및 세션 관리
 # =========================
@@ -29,17 +29,7 @@ with st.sidebar:
     if api_key:
         genai.configure(api_key=api_key)
         st.success("✅ AI 연결됨")
-    st.divider()
-    st.markdown("### 🛠 모델 진단")
-    if st.button("내 API로 가능한 모델 보기"):
-        try:
-            st.write("사용 가능한 모델 목록:")
-            # generateContent 기능을 지원하는 모델만 필터링해서 보여줌
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    st.code(m.name) # 예: models/gemini-pro
-        except Exception as e:
-            st.error(f"목록 조회 실패: {e}")
+    
     st.divider()
     st.markdown("### 상태 모니터")
     if st.session_state.jokbo_done:
@@ -71,7 +61,6 @@ def get_embedding(text):
         )
         return result['embedding']
     except Exception as e:
-        # 에러 발생 시 로그만 찍고 넘어감
         print(f"임베딩 에러: {e}")
         return None
 
@@ -95,7 +84,7 @@ def display_pdf_as_image(file_bytes, page_num):
     except Exception as e:
         st.error(f"PDF 렌더링 오류: {e}")
 
-# [최종] 사용자님이 확인한 모델명을 1순위로 적용한 코드
+# [핵심] 사용자님이 찾으신 모델을 적용한 분석 함수
 def analyze_connection(lecture_text, jokbo_text):
     if not api_key: return "AI 연결 필요"
     
@@ -118,13 +107,13 @@ def analyze_connection(lecture_text, jokbo_text):
     **분석:** (설명)
     """
     
-    # [핵심] 사용자님이 목록에서 직접 본 그 이름을 맨 위에 넣었습니다.
+    # 사용자님이 확인하신 모델을 1순위로 넣었습니다!
     candidate_models = [
-        "models/gemini-2.5-flash",      # 1순위: 방금 목록에서 보신 그 모델!
-        "models/gemini-1.5-flash",      # 2순위: 혹시 1.5였다면 이거
-        "gemini-1.5-flash",             # 3순위: 이름만 있는 버전
-        "models/gemini-2.0-flash-exp",  # 4순위: 최신 실험 버전
-        "models/gemini-pro",            # 5순위: 구관이 명관
+        "models/gemini-2.5-flash",      # 1순위 (사용자 확인)
+        "gemini-2.5-flash",             # 2순위 (이름 변형)
+        "models/gemini-1.5-flash",      # 3순위 (대안)
+        "gemini-1.5-flash",
+        "models/gemini-pro",            # 4순위 (기본)
         "gemini-pro"
     ]
 
@@ -132,16 +121,15 @@ def analyze_connection(lecture_text, jokbo_text):
     
     for model_name in candidate_models:
         try:
-            # 모델 생성 시도
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
-            return response.text # 성공하면 바로 리턴!
+            return response.text 
         except Exception as e:
             last_error = str(e)
-            continue # 실패하면 다음 후보로 넘어감
+            continue 
 
-    # 모든 후보가 다 실패했을 때만 에러 출력
     return f"분석 실패.\n시도한 모델들: {candidate_models}\n마지막 에러: {last_error}"
+
 # =========================
 # 2. 메인 UI
 # =========================
@@ -215,7 +203,6 @@ with tab1:
                         for i, p_text in enumerate(lec_pages):
                             if len(p_text) < 30: continue
                             try:
-                                # 1. 임베딩 검색
                                 q_emb = genai.embed_content(
                                     model="models/text-embedding-004",
                                     content=p_text,
@@ -223,13 +210,11 @@ with tab1:
                                 )['embedding']
                                 sims = cosine_similarity([q_emb], st.session_state.exam_embeddings).flatten()
                                 
-                                # 2. 매칭 및 AI 분석
                                 if sims.max() > 0.55:
                                     best_idx = sims.argmax()
                                     matched_text = st.session_state.exam_db[best_idx]['text']
                                     matched_info = st.session_state.exam_db[best_idx]['info']
                                     
-                                    # 여기서 AI에게 이유를 물어봅니다
                                     ai_reason = analyze_connection(p_text, matched_text)
                                     
                                     results.append({
@@ -242,7 +227,7 @@ with tab1:
                             except Exception as e:
                                 print(f"Error page {i}: {e}")
                             
-                            time.sleep(1.0) # AI 분석하느라 시간이 좀 걸리므로 딜레이
+                            time.sleep(1.0)
                             bar2.progress((i+1)/len(lec_pages))
                         
                         st.session_state.pre_analysis = results
@@ -273,7 +258,6 @@ with tab2:
                 for match in matches:
                     with st.expander(f"🔥 기출 적중 ({match['score']*100:.0f}%) - {match['exam_info']}", expanded=True):
                         
-                        # AI 분석 결과 출력
                         if 'ai_comment' in match:
                             st.markdown(f"""
                             <div style="background-color: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #2196f3; color: #0d47a1;">
@@ -281,7 +265,6 @@ with tab2:
                             </div>
                             """, unsafe_allow_html=True)
                         
-                        # 족보 원문 출력
                         st.markdown(
                             f"""
                             <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; color: #856404; font-size: 0.9em;">
@@ -297,8 +280,3 @@ with tab2:
                 st.write("가볍게 읽고 넘어가셔도 좋습니다.")
     else:
         st.warning("데이터 학습 탭에서 강의록을 먼저 업로드하고 분석해주세요.")
-
-
-
-
-
