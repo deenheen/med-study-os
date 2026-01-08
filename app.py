@@ -1,178 +1,158 @@
-import streamlit as st
-import pandas as pd
-import base64
-import os
-from pypdf import PdfReader
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from streamlit_mic_recorder import mic_recorder
+import fitz  # PyMuPDF
+from PIL import Image
+import google.generativeai as genai_ver # 라이브러리 버전 확인용
 
 # =========================
 # 1. 초기 설정 및 세션 관리
 # =========================
-st.set_page_config(page_title="Med-Study AI Visualizer", layout="wide")
+st.set_page_config(page_title="Med-Study OS v0.5 (Light)", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="Med-Study OS v0.5 (Final)", layout="wide", page_icon="🩺")
 
-# 세션 상태 초기화
-if 'pre_analysis' not in st.session_state: st.session_state.pre_analysis = []
-if 'exam_db' not in st.session_state: st.session_state.exam_db = []
-if 'vectorizer' not in st.session_state: st.session_state.vectorizer = None
-if 'matrix' not in st.session_state: st.session_state.matrix = None
-if 'pdf_bytes' not in st.session_state: st.session_state.pdf_bytes = None
+# 상태 변수 초기화
+if 'jokbo_done' not in st.session_state: st.session_state.jokbo_done = False
+@@ -24,12 +25,31 @@
+
+# 사이드바 설정
+with st.sidebar:
+    st.title("⚡ 설정 (Light Ver.)")
+    st.title("🔧 시스템 진단")
+    api_key = st.text_input("Gemini API Key", type="password")
+    
+    # [진단] 현재 설치된 라이브러리 버전 표시 (0.8.3 이상인지 확인용)
+    st.caption(f"📦 라이브러리 버전: {genai_ver.__version__}")
+
+    if api_key:
+        genai.configure(api_key=api_key)
+        st.success("✅ AI 연결됨")
+    
+        
+        # [핵심] 연결 가능한 모델을 실시간으로 조회
+        try:
+            my_models = []
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    my_models.append(m.name)
+            
+            if my_models:
+                st.success(f"✅ 연결 성공! ({len(my_models)}개 모델 감지)")
+                with st.expander("사용 가능한 모델 목록"):
+                    st.write(my_models)
+            else:
+                st.error("❌ 사용 가능한 모델이 없습니다.")
+        except Exception as e:
+            st.error(f"⚠️ API 연결 실패: {e}")
+
+    st.divider()
+    st.markdown("### 상태 모니터")
+    if st.session_state.jokbo_done:
+@@ -61,7 +81,7 @@ def get_embedding(text):
+        )
+        return result['embedding']
+    except Exception as e:
+        print(f"임베딩 에러: {e}")
+        # 임베딩 에러는 보통 조용히 넘어가는게 낫습니다.
+        return None
 
 def get_pdf_text(file):
-    reader = PdfReader(file)
-    return [page.extract_text() or "" for page in reader.pages]
+@@ -75,7 +95,7 @@ def display_pdf_as_image(file_bytes, page_num):
 
-def display_pdf(file_bytes, page_num):
-    """PDF를 베이스64로 인코딩하여 브라우저에 표시 (페이지 연동 포함)"""
-    base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}#page={page_num}" width="100%" height="850" type="application/pdf"></iframe>'
-    st.markdown(pdf_display, unsafe_allow_html=True)
+        if 0 <= page_idx < len(doc):
+            page = doc.load_page(page_idx)
+            mat = fitz.Matrix(2, 2) # 해상도 2배
+            mat = fitz.Matrix(2, 2) 
+            pix = page.get_pixmap(matrix=mat)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            st.image(img, use_container_width=True)
+@@ -84,7 +104,7 @@ def display_pdf_as_image(file_bytes, page_num):
+    except Exception as e:
+        st.error(f"PDF 렌더링 오류: {e}")
+
+# [속도 개선] 가장 가벼운 모델(1.5 Flash)을 최우선으로 사용
+# [최종 해결] 이름을 추측하지 않고, 조회된 모델 중 하나를 골라 쓰는 함수
+def analyze_connection(lecture_text, jokbo_text):
+    if not api_key: return "AI 연결 필요"
+
+@@ -103,32 +123,35 @@ def analyze_connection(lecture_text, jokbo_text):
+    **분석:** (한 줄 요약)
+    """
+
+    # ⚡ 속도 최적화 모델 리스트 (가벼운 순서)
+    candidate_models = [
+        "gemini-1.5-flash",         # 1순위: 가장 빠름
+        "models/gemini-1.5-flash",  # 2순위
+        "gemini-1.5-flash-002",     # 3순위: 최신 최적화 버전
+        "gemini-1.0-pro",           # 4순위: 구버전 (가벼움)
+        "gemini-pro"
+    ]
+    try:
+        # 1. 사용 가능한 모델 목록 다시 조회
+        valid_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        if not valid_models:
+            return "분석 실패: 사용 가능한 모델이 없습니다."
+
+    last_error = ""
+    
+    for model_name in candidate_models:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text 
+        except Exception as e:
+            last_error = str(e)
+            continue 
+        # 2. 가장 좋은 모델 자동 선택 (Flash > Pro > 아무거나)
+        best_model = valid_models[0] # 기본값: 목록의 첫 번째
+        
+        for m in valid_models:
+            if 'flash' in m.lower(): # Flash가 있으면 1순위
+                best_model = m
+                break
+            if 'pro' in m.lower() and 'flash' not in best_model.lower(): # Pro는 2순위
+                best_model = m
+        
+        # 3. 선택된 모델로 실행 (이제 이름 틀릴 일이 없음)
+        model = genai.GenerativeModel(best_model)
+        response = model.generate_content(prompt)
+        return response.text 
+
+    return f"분석 실패 (에러: {last_error})"
+    except Exception as e:
+        return f"분석 에러 ({best_model} 사용 시도): {e}"
 
 # =========================
-# 2. 메인 UI 화면 구성
+# 2. 메인 UI
 # =========================
-st.title("🩺 Med-Study OS: 시각적 뷰어 & 실시간 족보")
+st.title("⚡ Med-Study OS: 라이트 버전")
+st.title("🩺 Med-Study OS: Final Ver.")
 
-tab1, tab2, tab3 = st.tabs(["📂 1. 데이터 준비", "🎙️ 2. 수업 중: 뷰어 & 실시간 매칭", "🎯 3. 수업 후: 복습 리포트"])
+tab1, tab2 = st.tabs(["📂 데이터 학습 (준비)", "📖 강의 뷰어 (공부)"])
 
-# --- [Tab 1: 데이터 준비 및 사전 분석] ---
-with tab1:
-    st.header("강의실 가기 전: 족보 데이터와 강의록 연동")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("1. 족보 PDF 등록")
-        exam_files = st.file_uploader("과거 족보 파일들을 업로드하세요", type="pdf", accept_multiple_files=True)
-        if st.button("족보 데이터 인덱싱 시작"):
-            all_exams = []
-            for f in exam_files:
-                texts = get_pdf_text(f)
-                for i, text in enumerate(texts):
-                    if text.strip():
-                        all_exams.append({"info": f"{f.name} (p.{i+1})", "text": text})
-            
-            if all_exams:
-                st.session_state.exam_db = all_exams
-                vec = TfidfVectorizer(ngram_range=(1, 2))
-                st.session_state.matrix = vec.fit_transform([e['text'] for e in all_exams])
-                st.session_state.vectorizer = vec
-                st.success(f"{len(all_exams)}개의 족보 페이지 인덱싱 완료!")
+@@ -163,8 +186,7 @@ def analyze_connection(lecture_text, jokbo_text):
+                                if emb:
+                                    all_exams.append({"info": f"{f.name} p.{i+1}", "text": text})
+                                    embeddings.append(emb)
+                                # ⚡ 학습 속도도 높이기 위해 대기 시간 단축 (0.5 -> 0.2)
+                                time.sleep(0.2)
+                                time.sleep(0.3)
+                        bar.progress((idx + 1) / total_files)
 
-    with col2:
-        st.subheader("2. 오늘 강의록 매칭")
-        lec_file = st.file_uploader("오늘 수업용 강의록 PDF", type="pdf")
-        if lec_file:
-            # 뷰어용 바이너리 저장
-            st.session_state.pdf_bytes = lec_file.getvalue()
-            if st.button("수업 전 자동 단권화 분석"):
-                if st.session_state.vectorizer:
-                    lec_pages = get_pdf_text(lec_file)
-                    results = []
-                    for i, p_text in enumerate(lec_pages):
-                        if not p_text.strip(): continue
-                        qv = st.session_state.vectorizer.transform([p_text])
-                        sims = cosine_similarity(qv, st.session_state.matrix).flatten()
-                        if sims.max() > 0.2:
-                            best_idx = sims.argmax()
-                            results.append({
-                                "page": i+1, 
-                                "score": sims.max(), 
-                                "exam_info": st.session_state.exam_db[best_idx]['info'],
-                                "exam_text": st.session_state.exam_db[best_idx]['text']
-                            })
-                    st.session_state.pre_analysis = results
-                    st.success(f"분석 완료! {len(results)}개 페이지에서 족보 적중이 예상됩니다.")
-                else:
-                    st.error("먼저 족보 데이터를 등록해주세요.")
+                    if embeddings:
+@@ -188,7 +210,7 @@ def analyze_connection(lecture_text, jokbo_text):
+            st.session_state.total_pages = len(reader.pages)
 
-# --- [Tab 2: 수업 중 시각적 뷰어 & 실시간 녹음] ---
-with tab2:
-    if st.session_state.pdf_bytes is None:
-        st.warning("Tab 1에서 강의록 PDF를 먼저 업로드해주세요.")
-    else:
-        # 화면 레이아웃 분할
-        col_pdf, col_live = st.columns([1.2, 0.8])
-        
-        with col_pdf:
-            st.subheader("📄 강의록 실시간 뷰어")
-            # PDF 페이지 조절 슬라이더
-            page_selection = st.select_slider("페이지 이동", options=range(1, 51), value=1)
-            display_pdf(st.session_state.pdf_bytes, page_selection)
+            if not st.session_state.lecture_done:
+                if st.button("강의록 분석 시작 ⚡"):
+                if st.button("강의록 분석 시작 🔍"):
+                    if not st.session_state.jokbo_done:
+                        st.error("족보 학습을 먼저 완료해주세요!")
+                    else:
+@@ -223,8 +245,6 @@ def analyze_connection(lecture_text, jokbo_text):
+                            except Exception as e:
+                                print(f"Error page {i}: {e}")
 
-        with col_live:
-            st.subheader("🎙️ 실시간 족보 매칭 알림")
-            
-            # 1. 실시간 녹음 컨트롤러
-            st.write("교수님 설명을 인식하여 족보와 대조합니다.")
-            audio = mic_recorder(start_prompt="🔴 실시간 분석 시작", stop_prompt="⏹️ 중지 및 매칭", key='live_recorder')
-            
-            if audio:
-                st.audio(audio['bytes'])
-                # 시뮬레이션: 실제로는 STT API 연동 구간
-                simulated_speech = "심근경색 환자가 응급실에 오면 가장 먼저 ST분절 상승 여부를 확인해야 합니다."
-                st.info(f"🗣️ 교수님 발언 인식: \"{simulated_speech}\"")
-                
-                # 실시간 매칭 로직 (전체 족보 DB 대상 검색)
-                if st.session_state.vectorizer is not None:
-                    qv_live = st.session_state.vectorizer.transform([simulated_speech])
-                    sims_live = cosine_similarity(qv_live, st.session_state.matrix).flatten()
-                    if sims_live.max() > 0.15:
-                        best_hit = sims_live.argmax()
-                        st.toast("🔥 족보 적중!", icon="🚨")
-                        with st.warning():
-                            st.markdown(f"### 🚨 실시간 기출 매칭 완료")
-                            st.write(f"**출처:** {st.session_state.exam_db[best_hit]['info']}")
-                            st.write(f"**기출 지문:** {st.session_state.exam_db[best_hit]['text'][:300]}...")
-                
-            st.divider()
-            
-            # 2. 현재 PDF 페이지 기준 사전 분석 정보 표시
-            st.subheader(f"📍 현재 {page_selection}p 기출 정보")
-            page_matches = [res for res in st.session_state.pre_analysis if res['page'] == page_selection]
-            
-            if page_matches:
-                for match in page_matches:
-                    with st.expander("✅ 이 페이지와 연관된 족보 확인", expanded=True):
-                        st.error(f"기출 출처: {match['exam_info']}")
-                        st.write(f"지문 내용: {match['exam_text'][:300]}...")
-                        if st.button("📌 오늘 단권화 노트에 마킹"):
-                            st.toast("노트에 저장되었습니다!")
-            else:
-                st.info("이 페이지와 관련된 기출 내역이 없습니다.")
-
-# --- [Tab 3: 복습 리포트 개선 코드] ---
-with tab3:
-    st.header("🎯 오늘의 스마트 단권화 리포트")
-    
-    if st.session_state.pre_analysis:
-        # 데이터프레임 가공
-        df = pd.DataFrame(st.session_state.pre_analysis)
-        
-        # 1. 소수점 점수를 백분율로 변환
-        df['일치도'] = (df['score'] * 100).round(1).astype(str) + '%'
-        
-        # 2. 점수에 따른 중요도 등급 부여 함수
-        def get_importance(score):
-            if score >= 0.35: return "🔥 매우 높음 (필암기)"
-            elif score >= 0.25: return "✅ 보통 (빈출)"
-            else: return "⚠️ 참고 (유사성 낮음)"
-            
-        df['중요도'] = df['score'].apply(get_importance)
-        
-        # 3. 사용자에게 보여줄 열만 선택 및 이름 변경
-        display_df = df[['page', '중요도', '일치도', 'exam_info']].rename(columns={
-            'page': '강의록 페이지',
-            'exam_info': '관련 족보 출처'
-        })
-        
-        st.subheader("📋 기출 적중 분석 요약")
-        
-        # 4. 보기 좋게 스타일링된 표 출력
-        st.table(display_df) 
-        
-        # Anki 카드 생성 기능 유지
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 오늘 기출 기반 Anki 카드 다운로드", csv, "anki_cards.csv", "text/csv")
-    else:
-        st.write("표시할 분석 리포트가 없습니다.")
+                            # ⚡ [중요] 분석 대기 시간을 1.0초 -> 0.3초로 대폭 단축!
+                            # Flash 모델은 빨라서 이래도 괜찮습니다.
+                            time.sleep(0.3)
+                            bar2.progress((i+1)/len(lec_pages))
