@@ -1,9 +1,8 @@
+# requirements.txt
 streamlit
-pandas
-pypdf
-scikit-learn
-streamlit-mic-recorder
-numpy
+google-generativeai>=0.7.0
 pymupdf
-google-generativeai>=0.8.3
+scikit-learn
+numpy
+watchdog
 Pillow
