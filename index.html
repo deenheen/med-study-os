@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v10.0 (Real Chat & Jokbo Sync)</title>
+    <title>Med-Study OS v11.0 (Full List Scroll)</title>
     <style>
-        /* [기본 스타일 & 폰트] */
+        /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
         body { background-color: #f0f2f5; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
@@ -25,18 +25,16 @@
         .pdf-page.active { display: flex; animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
-        /* PDF 내부 디자인 */
+        /* PDF 내용 스타일 */
         .slide-header { border-bottom: 2px solid #003c8f; padding-bottom: 10px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
         .slide-title { font-size: 24px; font-weight: 800; color: #003c8f; }
         .slide-sub { font-size: 14px; color: #666; font-weight: 600; }
         .content-block { margin-bottom: 25px; }
         .section-title { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; align-items: center; }
         .section-title::before { content: ""; display: inline-block; width: 4px; height: 16px; background: #1565c0; margin-right: 8px; }
-        .text-body { font-size: 14px; line-height: 1.7; color: #444; text-align: justify; letter-spacing: -0.3px; outline: none; }
+        .text-body { font-size: 14px; line-height: 1.7; color: #444; text-align: justify; outline: none; }
         .info-box { background: #f5f9ff; border: 1px solid #b3e5fc; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #0277bd; outline: none; }
         .warn-box { background: #fff5f5; border: 1px solid #ffcdd2; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #c62828; font-weight: 600; outline: none; }
-        .lab-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0; }
-        .lab-table th, .lab-table td { padding: 6px; border: 1px solid #ccc; text-align: center; outline: none; }
 
         /* 네비게이션 버튼 */
         .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 20px; z-index: 100; transition: 0.2s; }
@@ -44,11 +42,9 @@
         .nav-prev { left: 20px; } .nav-next { right: 20px; }
         .nav-btn.disabled { opacity: 0; pointer-events: none; }
 
-        /* 포스트잇 (Yellow: AI) */
+        /* 포스트잇 */
         .dropped-note { position: absolute; width: 220px; background-color: #fff9c4; border-left: 4px solid #fbc02d; padding: 10px; font-size: 12px; color: #333; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); border-radius: 0 6px 6px 0; cursor: pointer; z-index: 50; line-height: 1.4; outline: none; }
         .dropped-note:hover { transform: scale(1.05); z-index: 60; }
-        
-        /* 포스트잇 (Pink: 족보) */
         .dropped-note.jokbo-note { background-color: #ffebee; border-left: 4px solid #ef5350; }
 
         /* --- [오른쪽: 패널] --- */
@@ -61,37 +57,31 @@
         
         /* 탭 컨텐츠 영역 */
         .tab-content-container { flex: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; display: flex; flex-direction: column; }
-        .tab-content { display: none; padding: 20px; padding-bottom: 80px; flex: 1; }
-        .tab-content.active { display: block; }
+        .tab-content { display: none; padding: 20px; padding-bottom: 80px; flex: 1; flex-direction: column; }
+        .tab-content.active { display: flex; }
 
         /* 1. 채팅 스타일 */
-        .chat-wrapper { display: flex; flex-direction: column; height: 100%; }
         .chat-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 16px; }
-        
         .msg-group { display: flex; flex-direction: column; gap: 6px; }
         .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
         .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
         .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
         .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: grab; }
         .ai-msg:hover { border-color: #2196f3; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15); }
-
-        /* 채팅 입력창 (Footer) */
-        .chat-input-area {
-            height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px;
-            display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-        }
+        .chat-input-area { height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
-        .chat-input:focus { border-color: #2196f3; background: white; }
-        .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; justify-content: center; align-items: center; }
+        .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
 
-        /* 2. 족보 스타일 (전체 보이기 + 하이라이트) */
+        /* 2. 족보 스타일 (Full List) */
+        .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; }
         .jokbo-card { 
             background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; outline: none; 
-            opacity: 0.6; /* 기본은 흐리게 */ transition: all 0.3s; cursor: grab;
+            transition: all 0.3s; cursor: grab; opacity: 0.8;
         }
         .jokbo-card:hover { opacity: 1; border-color: #bbb; }
-        .jokbo-card.active-highlight { 
-            opacity: 1; border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2); transform: scale(1.02); background: #f0f7ff; 
+        /* 싱크 시 강조 효과 */
+        .jokbo-card.active-sync { 
+            opacity: 1; border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2); background: #f4faff; 
         }
         
         .badge { display: inline-block; padding: 3px 8px; font-size: 11px; border-radius: 4px; font-weight: 700; margin-right: 6px; outline: none; }
@@ -99,20 +89,28 @@
         .q-body { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 12px; line-height: 1.5; outline: none; }
         .q-options div { cursor: pointer; padding: 4px 8px; border-radius: 4px; outline: none; }
 
-        /* 3. 스크립트 */
-        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; transition: all 0.3s; }
+        /* 3. 스크립트 스타일 */
+        .script-list-area { flex: 1; overflow-y: auto; padding-bottom: 80px; } /* 플레이어 공간 확보 */
+        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; transition: all 0.3s; opacity: 0.8; }
+        .script-segment.active-sync { opacity: 1; border-left: 5px solid #2196f3; background: #fbfdff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .script-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: #888; }
         .script-text { font-size: 14px; line-height: 1.6; color: #333; outline: none; }
 
-        /* 싱크 하이라이트 공통 */
-        .active-context-bg { background-color: #fff9c4 !important; }
+        /* 오디오 플레이어 (스크립트 탭 전용) */
+        .audio-player-bar {
+            position: absolute; bottom: 0; left: 0; right: 0; height: 75px; background: white; border-top: 1px solid #ddd;
+            display: flex; align-items: center; padding: 0 20px; gap: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            display: none; z-index: 200;
+        }
+
+        /* 싱크 하이라이트 (채팅용) */
+        .active-context-bg { background-color: #fff9c4 !important; transition: background-color 1s; }
 
         /* 편집 툴바 */
         .edit-toolbar { position: fixed; bottom: 30px; right: 30px; display: flex; gap: 10px; z-index: 9999; }
         .tool-btn { width: 50px; height: 50px; border-radius: 25px; border: none; color: white; font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: 0.2s; display: flex; justify-content: center; align-items: center; }
         .btn-edit { background: #2196f3; } .btn-edit.active { background: #e91e63; }
         .btn-reset { background: #607d8b; font-size: 20px; }
-        
         .editing-mode .editable-target:hover { outline: 2px dashed #2196f3; background: rgba(33,150,243,0.05); cursor: text; }
         .add-btn { display: none; width: 100%; padding: 10px; margin-top: 10px; background: #e3f2fd; border: 2px dashed #2196f3; color: #2196f3; font-weight: bold; cursor: pointer; text-align: center; border-radius: 8px; }
         .editing-mode .add-btn { display: block; }
@@ -180,62 +178,84 @@
         </div>
 
         <div class="tab-content-container">
-            <div id="tab-chat" class="tab-content active" style="display:flex; flex-direction:column; padding:0; height:100%;">
-                <div class="chat-wrapper">
-                    <div class="chat-scroll-area" style="padding:20px;">
-                        <div class="msg-group" id="chat-13-1">
-                            <div class="msg-meta editable-target">Page 13 • 병태생리</div>
-                            <div class="bubble user-msg editable-target">DKA의 핵심 기전이 뭐야?</div>
-                            <div class="bubble ai-msg editable-target" draggable="true" ondragstart="drag(event, 'ai')">인슐린 결핍으로 지방이 분해되어 케톤체가 생성됩니다.</div>
-                        </div>
-                        <div class="msg-group" id="chat-14-1">
-                            <div class="msg-meta editable-target">Page 14 • 임상증상</div>
-                            <div class="bubble user-msg editable-target">감염 없이 백혈구 증가 가능?</div>
-                            <div class="bubble ai-msg editable-target" draggable="true" ondragstart="drag(event, 'ai')">네, 스트레스 호르몬 증가로 인해 반응성으로 상승할 수 있습니다.</div>
-                        </div>
-                        <div class="add-btn" onclick="addChat()">➕ 새 대화 추가하기</div>
+            <div id="tab-chat" class="tab-content active" style="padding:0;">
+                <div class="chat-scroll-area" style="padding:20px;">
+                    <div class="msg-group" id="chat-13-1">
+                        <div class="msg-meta editable-target">Page 13 • 병태생리</div>
+                        <div class="bubble user-msg editable-target">DKA의 핵심 기전이 뭐야?</div>
+                        <div class="bubble ai-msg editable-target" draggable="true" ondragstart="drag(event, 'ai')">인슐린 결핍으로 지방이 분해되어 케톤체가 생성됩니다.</div>
                     </div>
-                    <div class="chat-input-area">
-                        <input type="text" class="chat-input" placeholder="AI 튜터에게 질문하기...">
-                        <button class="send-btn">➤</button>
+                    <div class="msg-group" id="chat-14-1">
+                        <div class="msg-meta editable-target">Page 14 • 임상증상</div>
+                        <div class="bubble user-msg editable-target">감염 없이 백혈구 증가 가능?</div>
+                        <div class="bubble ai-msg editable-target" draggable="true" ondragstart="drag(event, 'ai')">네, 스트레스 호르몬 증가로 인해 반응성으로 상승할 수 있습니다.</div>
                     </div>
+                    <div class="add-btn" onclick="addChat()">➕ 새 대화 추가하기</div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" placeholder="AI 튜터에게 질문하기...">
+                    <button class="send-btn">➤</button>
                 </div>
             </div>
 
             <div id="tab-jokbo" class="tab-content">
-                <div style="font-size:12px; color:#999; margin-bottom:10px; text-align:center;">전체 기출 리스트 (페이지 연동됨)</div>
-                
-                <div class="jokbo-card p13-item" id="jokbo-13" draggable="true" ondragstart="drag(event, 'jokbo')">
-                    <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
-                    <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
-                    <div class="q-options editable-target">① Glucagon ② Cortisol ③ Insulin (정답)</div>
-                </div>
-                
-                <div class="jokbo-card p14-item" id="jokbo-14" draggable="true" ondragstart="drag(event, 'jokbo')">
-                    <div class="badge-row"><span class="badge year editable-target">22년</span></div>
-                    <div class="q-body editable-target">Q. 복통, 과일 냄새, 깊은 호흡 환자의 진단은?</div>
-                    <div class="q-options editable-target">① 췌장염 ② DKA (정답)</div>
-                </div>
+                <div class="jokbo-list-area">
+                    <div class="jokbo-card p13-item" id="jokbo-13" draggable="true" ondragstart="drag(event, 'jokbo')">
+                        <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
+                        <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
+                        <div class="q-options editable-target">① Glucagon ② Cortisol ③ Insulin (정답)</div>
+                    </div>
+                    
+                    <div class="jokbo-card p14-item" id="jokbo-14" draggable="true" ondragstart="drag(event, 'jokbo')">
+                        <div class="badge-row"><span class="badge year editable-target">22년</span></div>
+                        <div class="q-body editable-target">Q. 복통, 과일 냄새, 깊은 호흡 환자의 진단은?</div>
+                        <div class="q-options editable-target">① 췌장염 ② DKA (정답)</div>
+                    </div>
 
-                <div class="jokbo-card p15-item" id="jokbo-15" draggable="true" ondragstart="drag(event, 'jokbo')">
-                    <div class="badge-row"><span class="badge year editable-target">24년</span></div>
-                    <div class="q-body editable-target">Q. K+ 2.8인 DKA 환자의 우선 처치는?</div>
-                    <div class="q-options editable-target">① 인슐린 ② KCl 투여 (정답)</div>
-                </div>
+                    <div class="jokbo-card p15-item" id="jokbo-15" draggable="true" ondragstart="drag(event, 'jokbo')">
+                        <div class="badge-row"><span class="badge year editable-target">24년</span></div>
+                        <div class="q-body editable-target">Q. K+ 2.8인 DKA 환자의 우선 처치는?</div>
+                        <div class="q-options editable-target">① 인슐린 ② KCl 투여 (정답)</div>
+                    </div>
+                    
+                    <div class="jokbo-card">
+                        <div class="badge-row"><span class="badge year">21년</span></div>
+                        <div class="q-body">Q. DKA 치료 중 뇌부종 발생 시 처치는?</div>
+                        <div class="q-options">① Mannitol (정답)</div>
+                    </div>
 
-                <div class="add-btn" onclick="addJokbo()">➕ 새 문제 추가하기</div>
+                    <div class="add-btn" onclick="addJokbo()">➕ 새 문제 추가하기</div>
+                </div>
             </div>
 
-            <div id="tab-script" class="tab-content">
-                <div class="script-segment" id="script-13-1">
-                    <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:30</span></div>
-                    <div class="script-text editable-target">자, DKA는 인슐린이 없어서 몸이 산성으로 변하는 응급 질환입니다.</div>
+            <div id="tab-script" class="tab-content" style="padding:0;">
+                <div class="script-list-area" style="padding:20px;">
+                    <div class="script-segment p13-script" id="script-13-1">
+                        <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:30</span></div>
+                        <div class="script-text editable-target">자, DKA는 인슐린이 없어서 몸이 산성으로 변하는 응급 질환입니다. 케톤체가 원인이죠.</div>
+                    </div>
+                    <div class="script-segment p14-script" id="script-14-1">
+                        <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:45</span></div>
+                        <div class="script-text editable-target">쿠스마울 호흡 잘 보세요. 그리고 배 아프다고 맹장염으로 오진하면 안 됩니다.</div>
+                    </div>
+                    <div class="script-segment p15-script" id="script-15-1">
+                        <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">10:05</span></div>
+                        <div class="script-text editable-target">치료 순서 족보입니다. 수액 먼저, 칼륨 확인하고 인슐린입니다. 순서 틀리면 큰일납니다.</div>
+                    </div>
+                    <div class="script-segment">
+                        <div class="script-header"><span class="speaker-name">교수님</span><span>10:20</span></div>
+                        <div class="script-text">다음 시간에는 HHS에 대해 알아볼 건데, DKA랑 비교해서 표로 외우세요.</div>
+                    </div>
+                    <div class="add-btn" onclick="addScript()">➕ 새 스크립트 추가하기</div>
                 </div>
-                <div class="script-segment" id="script-14-1">
-                    <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:45</span></div>
-                    <div class="script-text editable-target">쿠스마울 호흡 잘 보세요. 그리고 배 아프다고 맹장염으로 오진하면 안 됩니다.</div>
+                
+                <div class="audio-player-bar" id="audioPlayer">
+                    <div style="width:40px; height:40px; background:#2196f3; border-radius:50%; color:white; display:flex; justify-content:center; align-items:center;">▶</div>
+                    <div style="flex:1; height:6px; background:#eee; border-radius:3px; overflow:hidden;">
+                        <div style="width:30%; height:100%; background:#2196f3;"></div>
+                    </div>
+                    <div style="font-size:12px; color:#666;">09:45</div>
                 </div>
-                <div class="add-btn" onclick="addScript()">➕ 새 스크립트 추가하기</div>
             </div>
         </div>
     </div>
@@ -247,21 +267,19 @@
     let isEditing = false;
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v10')) {
-            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v10');
-            // 이벤트 재연결 필요 없음 (onclick 인라인 사용)
+        if(localStorage.getItem('medStudyData_v11')) {
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v11');
         }
-        // 초기 싱크 맞춤
-        changePage(0);
+        changePage(0); // 초기 싱크
     };
 
     document.addEventListener('input', function() {
-        if(isEditing) localStorage.setItem('medStudyData_v10', document.getElementById('appRoot').innerHTML);
+        if(isEditing) localStorage.setItem('medStudyData_v11', document.getElementById('appRoot').innerHTML);
     });
 
     function resetData() {
         if(confirm("초기화하시겠습니까?")) {
-            localStorage.removeItem('medStudyData_v10');
+            localStorage.removeItem('medStudyData_v11');
             location.reload();
         }
     }
@@ -281,11 +299,11 @@
             btn.innerHTML = '✎';
             body.classList.remove('editing-mode');
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false");
-            localStorage.setItem('medStudyData_v10', document.getElementById('appRoot').innerHTML);
+            localStorage.setItem('medStudyData_v11', document.getElementById('appRoot').innerHTML);
         }
     }
 
-    // 네비게이션 및 싱크 로직
+    // 네비게이션
     function changePage(direction) {
         if (direction !== 0) {
             const nextIdx = currentPageIdx + direction;
@@ -305,56 +323,58 @@
         syncRightPanel(pageNum);
     }
 
+    // 싱크 로직 (스크롤 이동 + 강조)
     function syncRightPanel(pageNum) {
-        // 1. 족보 하이라이트 로직
-        // 모든 카드 활성화 해제 (흐리게)
-        document.querySelectorAll('.jokbo-card').forEach(card => card.classList.remove('active-highlight'));
-        
-        // 해당 페이지 카드들 찾아서 강조
+        // 1. 족보 싱크
+        document.querySelectorAll('.jokbo-card').forEach(c => c.classList.remove('active-sync'));
         const targetJokbo = document.querySelectorAll(`.p${pageNum}-item`);
         targetJokbo.forEach(card => {
-            card.classList.add('active-highlight');
-            // 족보 탭이 활성화 상태라면 스크롤 이동
+            card.classList.add('active-sync');
             if(document.getElementById('tab-jokbo').classList.contains('active')) {
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         });
 
-        // 2. 채팅 싱크 (기존 로직)
-        const chatTargetId = `chat-${pageNum}-1`;
-        const chatEl = document.getElementById(chatTargetId);
+        // 2. 스크립트 싱크
+        document.querySelectorAll('.script-segment').forEach(s => s.classList.remove('active-sync'));
+        const targetScript = document.querySelectorAll(`.p${pageNum}-script`);
+        targetScript.forEach(seg => {
+            seg.classList.add('active-sync');
+            if(document.getElementById('tab-script').classList.contains('active')) {
+                seg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+
+        // 3. 채팅 싱크
+        const chatEl = document.getElementById(`chat-${pageNum}-1`);
         if(chatEl && document.getElementById('tab-chat').classList.contains('active')) {
             chatEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            chatEl.classList.add('active-context-bg');
-            setTimeout(()=>chatEl.classList.remove('active-context-bg'), 2000);
+            chatEl.querySelector('.bubble.ai-msg').classList.add('active-context-bg');
+            setTimeout(()=>chatEl.querySelector('.bubble.ai-msg').classList.remove('active-context-bg'), 1500);
         }
     }
 
     function showTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         
-        // 채팅 탭은 flex display 유지 필요
         const targetTab = document.getElementById(tabId);
         targetTab.classList.add('active');
-        if(tabId === 'tab-chat') {
-            targetTab.style.display = 'flex';
-            targetTab.style.flexDirection = 'column';
-        } else {
-            targetTab.style.display = 'block';
-        }
         
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab')[['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId)].classList.add('active');
         
-        // 탭 전환 시 현재 페이지 기준 다시 싱크
+        // 스크립트 탭일 때만 플레이어 표시
+        const player = document.getElementById('audioPlayer');
+        if (tabId === 'tab-script') player.style.display = 'flex';
+        else player.style.display = 'none';
+
         const pageNum = pages[currentPageIdx].replace('p', '');
         setTimeout(() => syncRightPanel(pageNum), 100);
     }
 
-    // Drag & Drop (AI 메모 vs 족보 구분)
     function drag(ev, type) { 
         ev.dataTransfer.setData("text", ev.target.innerText);
-        ev.dataTransfer.setData("type", type); // 'ai' or 'jokbo'
+        ev.dataTransfer.setData("type", type);
     }
     
     function allowDrop(ev) { ev.preventDefault(); }
@@ -370,19 +390,15 @@
         note.setAttribute("ondblclick", "deleteNote(this)");
         
         if (type === 'jokbo') {
-            // 족보는 분홍색, 내용 요약
             note.classList.add('jokbo-note');
-            // 족보 텍스트에서 'Q.' 뒷부분만 따오거나 전체 가져오기
             const summary = text.split('\n')[1] || text.substring(0, 30);
             note.innerHTML = `📌 <strong>족보 연결</strong><br>${summary.substring(0, 40)}...`;
         } else {
-            // AI는 노란색
             note.innerHTML = `📌 <strong>AI 메모</strong><br>${text.substring(0, 30)}...`;
         }
 
         note.style.left = (ev.clientX - rect.left) + "px"; 
         note.style.top = (ev.clientY - rect.top) + "px";
-        
         if(isEditing) note.contentEditable = "true";
         ev.currentTarget.appendChild(note);
     }
@@ -391,7 +407,6 @@
         if(isEditing && confirm("삭제하시겠습니까?")) el.remove();
     }
     
-    // 추가 기능들
     function addChat() {
         const container = document.querySelector('.chat-scroll-area');
         const newChat = document.createElement('div');
@@ -400,7 +415,7 @@
         container.insertBefore(newChat, container.lastElementChild);
     }
     function addJokbo() {
-        const container = document.querySelector('#tab-jokbo');
+        const container = document.querySelector('.jokbo-list-area');
         const newCard = document.createElement('div');
         newCard.className = 'jokbo-card';
         newCard.draggable = true;
@@ -409,7 +424,7 @@
         container.insertBefore(newCard, container.lastElementChild);
     }
     function addScript() {
-        const container = document.querySelector('#tab-script');
+        const container = document.querySelector('.script-list-area');
         const newScript = document.createElement('div');
         newScript.className = 'script-segment';
         newScript.innerHTML = `<div class="script-header"><span class="speaker-name editable-target" contenteditable="true">화자</span><span class="editable-target" contenteditable="true">00:00</span></div><div class="script-text editable-target" contenteditable="true">내용</div>`;
