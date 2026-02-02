@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Med-Study OS v9.0 (Editable & Save)</title>
+    <style>
+        /* [기본 스타일 & 폰트] */
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+        body { background-color: #f0f2f5; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+
+        /* [메인 프레임] */
+        .tablet-frame {
+            width: 1600px; height: 950px; background: white; border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15); border: 1px solid #ddd; display: flex; overflow: hidden; position: relative;
+        }
+
+        /* --- [왼쪽: PDF 뷰어] --- */
+        .left-panel { flex: 1.6; background-color: #3e3e3e; display: flex; flex-direction: column; border-right: 1px solid #333; position: relative; }
+        .pdf-header { height: 48px; background: #2b2b2b; color: #e0e0e0; display: flex; align-items: center; padding: 0 20px; justify-content: space-between; font-size: 13px; font-weight: 500; border-bottom: 1px solid #1a1a1a; }
+        .pdf-viewer-container { flex: 1; position: relative; overflow: hidden; background: #525659; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .pdf-page { width: 100%; height: 100%; max-width: 800px; max-height: 1130px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); padding: 40px 50px; position: absolute; display: none; flex-direction: column; overflow-y: auto; border-radius: 2px; }
+        .pdf-page.active { display: flex; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+        /* PDF 내부 디자인 */
+        .slide-header { border-bottom: 2px solid #003c8f; padding-bottom: 10px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .slide-title { font-size: 24px; font-weight: 800; color: #003c8f; }
+        .slide-sub { font-size: 14px; color: #666; font-weight: 600; }
+        .content-block { margin-bottom: 25px; }
+        .section-title { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; align-items: center; }
+        .section-title::before { content: ""; display: inline-block; width: 4px; height: 16px; background: #1565c0; margin-right: 8px; }
+        .text-body { font-size: 14px; line-height: 1.7; color: #444; text-align: justify; letter-spacing: -0.3px; outline: none; } /* outline 제거 */
+        .info-box { background: #f5f9ff; border: 1px solid #b3e5fc; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #0277bd; outline: none; }
+        .warn-box { background: #fff5f5; border: 1px solid #ffcdd2; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #c62828; font-weight: 600; outline: none; }
+        .lab-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0; }
+        .lab-table th, .lab-table td { padding: 6px; border: 1px solid #ccc; text-align: center; outline: none; }
+
+        /* 네비게이션 버튼 */
+        .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 20px; z-index: 100; transition: 0.2s; }
+        .nav-btn:hover { background: rgba(0,0,0,0.8); }
+        .nav-prev { left: 20px; } .nav-next { right: 20px; }
+        .nav-btn.disabled { opacity: 0; pointer-events: none; }
+
+        /* 포스트잇 */
+        .dropped-note { position: absolute; width: 220px; background-color: #fff9c4; border-left: 4px solid #fbc02d; padding: 10px; font-size: 12px; color: #333; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); border-radius: 0 6px 6px 0; cursor: pointer; z-index: 50; line-height: 1.4; outline: none; }
+        .dropped-note:hover { transform: scale(1.05); z-index: 60; }
+
+        /* --- [오른쪽: 패널] --- */
+        .right-panel { flex: 0.8; display: flex; flex-direction: column; background: #f7f8fa; border-left: 1px solid #ddd; position: relative; }
+        .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; flex-shrink: 0; height: 50px; }
+        .tab { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 600; color: #888; font-size: 14px; transition: 0.2s; }
+        .tab.active { color: #2196f3; border-bottom: 3px solid #2196f3; background: #fff; }
+        .tab-content-container { flex: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
+        .tab-content { display: none; padding: 20px; padding-bottom: 100px; }
+        .tab-content.active { display: block; }
+
+        /* 채팅 */
+        .chat-container { display: flex; flex-direction: column; gap: 16px; }
+        .msg-group { display: flex; flex-direction: column; gap: 6px; }
+        .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
+        .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
+        .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
+        .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: grab; }
+        .ai-msg:hover { border-color: #2196f3; box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15); }
+
+        /* 족보 */
+        .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; display: none; outline: none; }
+        .jokbo-card.visible { display: block; animation: fadeIn 0.3s; }
+        .badge { display: inline-block; padding: 3px 8px; font-size: 11px; border-radius: 4px; font-weight: 700; margin-right: 6px; outline: none; }
+        .badge.year { background: #e3f2fd; color: #1565c0; } .badge.freq { background: #ffebee; color: #c62828; }
+        .q-body { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 12px; line-height: 1.5; outline: none; }
+        .q-options div { cursor: pointer; padding: 4px 8px; border-radius: 4px; outline: none; }
+
+        /* 스크립트 */
+        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; transition: all 0.3s; }
+        .script-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: #888; }
+        .script-text { font-size: 14px; line-height: 1.6; color: #333; outline: none; }
+
+        /* 싱크 하이라이트 */
+        .active-context-bg { background-color: #fff9c4 !important; border-color: #fbc02d !important; }
+
+        /* [편집 모드 스타일] */
+        .editing-mode .editable-target:hover {
+            outline: 2px dashed #2196f3;
+            background-color: rgba(33, 150, 243, 0.05);
+            cursor: text;
+        }
+        .editing-mode .dropped-note:hover::after {
+            content: " 🗑️(더블클릭 삭제)"; font-size: 10px; color: red;
+        }
+        
+        /* 편집 툴바 (우측 하단 고정) */
+        .edit-toolbar {
+            position: fixed; bottom: 30px; right: 30px;
+            display: flex; gap: 10px; z-index: 9999;
+        }
+        .tool-btn {
+            width: 50px; height: 50px; border-radius: 25px; border: none;
+            color: white; font-size: 24px; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: 0.2s;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .btn-edit { background: #2196f3; }
+        .btn-edit.active { background: #e91e63; transform: scale(1.1); box-shadow: 0 0 15px rgba(233, 30, 99, 0.4); }
+        .btn-reset { background: #607d8b; font-size: 20px; }
+        .btn-reset:hover { background: #455a64; }
+        
+        .add-btn {
+            display: none; width: 100%; padding: 10px; margin-top: 10px;
+            background: #e3f2fd; border: 2px dashed #2196f3; color: #2196f3;
+            font-weight: bold; cursor: pointer; text-align: center; border-radius: 8px;
+        }
+        .editing-mode .add-btn { display: block; }
+        .tooltip {
+            position: absolute; bottom: 60px; right: 0; background: #333; color: white;
+            padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; opacity: 0; transition: 0.2s; width: max-content;
+        }
+        .tool-btn:hover + .tooltip { opacity: 1; }
+
+    </style>
+</head>
+<body>
+
+<div class="edit-toolbar">
+    <div style="position:relative;">
+        <button class="tool-btn btn-reset" onclick="resetData()">🔄</button>
+        <div class="tooltip">데이터 초기화</div>
+    </div>
+    <div style="position:relative;">
+        <button class="tool-btn btn-edit" id="editToggleBtn" onclick="toggleEditMode()">✎</button>
+        <div class="tooltip">편집 모드 ON/OFF</div>
+    </div>
+</div>
+
+<div class="tablet-frame" id="appRoot">
+    <div class="left-panel">
+        <div class="pdf-header">
+            <span class="editable-target">📚 [Internal Med] Endocrinology_Ch04_Diabetes.pdf</span>
+            <span id="headerPageNum">Page 13 / 60</span>
+        </div>
+        
+        <div class="pdf-viewer-container">
+            <div class="nav-btn nav-prev disabled" onclick="changePage(-1)">❮</div>
+            <div class="nav-btn nav-next" onclick="changePage(1)">❯</div>
+
+            <div class="pdf-page active" id="p13" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div class="slide-header">
+                    <div class="slide-title editable-target">Diabetic Ketoacidosis (DKA)</div>
+                    <div class="slide-sub editable-target">Endocrinology Part.4</div>
+                </div>
+                <div class="content-block">
+                    <div class="section-title editable-target">1. Definition & Epidemiology</div>
+                    <p class="text-body editable-target">
+                        인슐린의 절대적 결핍(Absolute deficiency)과 대항 호르몬의 증가로 인해 발생하는 급성 대사 합병증이다.
+                    </p>
+                </div>
+                <div class="dropped-note editable-target" style="top:400px; left:450px;" ondblclick="deleteNote(this)" onclick="focusChat('chat-13-1')">📌 AI: 병태생리 핵심 요약</div>
+            </div>
+
+            <div class="pdf-page" id="p14" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div class="slide-header"><div class="slide-title editable-target">Precipitating Factors</div></div>
+                <div class="content-block">
+                    <div class="section-title editable-target">Common Triggers</div>
+                    <div class="text-body editable-target">
+                        <ul><li>Infection (m/c): Pneumonia, UTI</li><li>Insulin Omission</li></ul>
+                    </div>
+                </div>
+                <div class="warn-box editable-target">⚠️ 감염 징후가 없더라도 백혈구 증가는 DKA 자체로 나타날 수 있다.</div>
+            </div>
+
+             <div class="pdf-page" id="p15" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <div class="slide-header"><div class="slide-title editable-target">Clinical Features</div></div>
+                <div class="content-block">
+                    <div class="section-title editable-target">Symptoms</div>
+                    <p class="text-body editable-target">다뇨, 다음, 구토, 복통 (급성 복증과 감별 요함).</p>
+                </div>
+                <div class="info-box editable-target">★ Kussmaul Respiration: 깊고 빠른 호흡, 과일 냄새.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('tab-chat')">AI 채팅</div>
+            <div class="tab" onclick="showTab('tab-jokbo')">관련 족보</div>
+            <div class="tab" onclick="showTab('tab-script')">녹음 스크립트</div>
+        </div>
+
+        <div class="tab-content-container">
+            <div id="tab-chat" class="tab-content active">
+                <div class="chat-container">
+                    <div class="msg-group" id="chat-13-1">
+                        <div class="msg-meta editable-target">Page 13 • 병태생리</div>
+                        <div class="bubble user-msg editable-target">DKA의 핵심 기전이 뭐야?</div>
+                        <div class="bubble ai-msg editable-target" draggable="true" ondragstart="drag(event)">인슐린 결핍으로 지방이 분해되어 케톤체가 생성됩니다.</div>
+                    </div>
+                    <div class="add-btn" onclick="addChat()">➕ 새 대화 추가하기</div>
+                </div>
+            </div>
+
+            <div id="tab-jokbo" class="tab-content">
+                <div class="jokbo-card p13-item visible">
+                    <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
+                    <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
+                    <div class="q-options editable-target">① Glucagon ② Cortisol ③ Insulin (정답)</div>
+                </div>
+                <div class="jokbo-card p14-item">
+                    <div class="badge-row"><span class="badge year editable-target">22년</span></div>
+                    <div class="q-body editable-target">Q. 복통, 과일 냄새, 깊은 호흡 환자의 진단은?</div>
+                    <div class="q-options editable-target">① 췌장염 ② DKA (정답)</div>
+                </div>
+                <div class="add-btn" onclick="addJokbo()">➕ 새 문제 추가하기</div>
+            </div>
+
+            <div id="tab-script" class="tab-content">
+                <div class="script-segment" id="script-13-1">
+                    <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:30</span></div>
+                    <div class="script-text editable-target">자, DKA는 인슐린이 없어서 몸이 산성으로 변하는 응급 질환입니다.</div>
+                </div>
+                <div class="add-btn" onclick="addScript()">➕ 새 스크립트 추가하기</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // [1. 상태 관리 및 로컬 스토리지]
+    const pages = ['p13', 'p14', 'p15'];
+    let currentPageIdx = 0;
+    let isEditing = false;
+
+    // 페이지 로드 시 저장된 데이터 불러오기
+    window.onload = function() {
+        if(localStorage.getItem('medStudyData')) {
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData');
+            // 이벤트 리스너 재연결
+            reattachEvents();
+        }
+    };
+
+    // 데이터 저장 (키 입력할 때마다)
+    document.addEventListener('input', function() {
+        if(isEditing) {
+            localStorage.setItem('medStudyData', document.getElementById('appRoot').innerHTML);
+        }
+    });
+
+    // 데이터 초기화
+    function resetData() {
+        if(confirm("모든 수정 사항을 초기화하시겠습니까?")) {
+            localStorage.removeItem('medStudyData');
+            location.reload();
+        }
+    }
+
+    // [2. 편집 모드 로직]
+    function toggleEditMode() {
+        isEditing = !isEditing;
+        const btn = document.getElementById('editToggleBtn');
+        const body = document.body;
+        
+        if(isEditing) {
+            btn.classList.add('active');
+            btn.innerHTML = '💾'; // 저장 아이콘으로 변경
+            body.classList.add('editing-mode');
+            
+            // 편집 가능하게 속성 부여
+            document.querySelectorAll('.editable-target').forEach(el => {
+                el.contentEditable = "true";
+            });
+        } else {
+            btn.classList.remove('active');
+            btn.innerHTML = '✎';
+            body.classList.remove('editing-mode');
+            
+            // 편집 불가 처리 및 저장
+            document.querySelectorAll('.editable-target').forEach(el => {
+                el.contentEditable = "false";
+            });
+            localStorage.setItem('medStudyData', document.getElementById('appRoot').innerHTML);
+            alert("수정 내용이 저장되었습니다!");
+        }
+    }
+
+    // [3. 요소 추가 기능]
+    function addChat() {
+        const container = document.querySelector('.chat-container');
+        const newChat = document.createElement('div');
+        newChat.className = 'msg-group';
+        newChat.innerHTML = `
+            <div class="msg-meta editable-target" contenteditable="true">New Page • 주제</div>
+            <div class="bubble user-msg editable-target" contenteditable="true">질문을 입력하세요.</div>
+            <div class="bubble ai-msg editable-target" contenteditable="true" draggable="true" ondragstart="drag(event)">AI 답변을 입력하세요.</div>
+        `;
+        container.insertBefore(newChat, container.lastElementChild); // 버튼 앞에 추가
+    }
+
+    function addScript() {
+        const container = document.querySelector('#tab-script');
+        const newScript = document.createElement('div');
+        newScript.className = 'script-segment';
+        newScript.innerHTML = `
+            <div class="script-header"><span class="speaker-name editable-target" contenteditable="true">화자</span><span class="editable-target" contenteditable="true">00:00</span></div>
+            <div class="script-text editable-target" contenteditable="true">내용을 입력하세요.</div>
+        `;
+        container.insertBefore(newScript, container.lastElementChild);
+    }
+
+    function addJokbo() {
+        const container = document.querySelector('#tab-jokbo');
+        const newCard = document.createElement('div');
+        newCard.className = 'jokbo-card visible';
+        newCard.innerHTML = `
+            <div class="badge-row"><span class="badge year editable-target" contenteditable="true">00년</span></div>
+            <div class="q-body editable-target" contenteditable="true">문제를 입력하세요.</div>
+            <div class="q-options editable-target" contenteditable="true">보기를 입력하세요.</div>
+        `;
+        container.insertBefore(newCard, container.lastElementChild);
+    }
+
+    // 포스트잇 삭제
+    function deleteNote(el) {
+        if(isEditing) {
+            if(confirm("이 메모를 삭제하시겠습니까?")) {
+                el.remove();
+            }
+        }
+    }
+
+    // [4. 기본 뷰어 기능 (네비게이션, 탭, 드래그앤드롭)]
+    function changePage(direction) {
+        const nextIdx = currentPageIdx + direction;
+        if (nextIdx < 0 || nextIdx >= pages.length) return;
+        document.getElementById(pages[currentPageIdx]).classList.remove('active');
+        currentPageIdx = nextIdx;
+        const newPageId = pages[currentPageIdx];
+        document.getElementById(newPageId).classList.add('active');
+        const pageNum = newPageId.replace('p', '');
+        document.getElementById('headerPageNum').innerText = `Page ${pageNum} / 60`;
+        document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0);
+        document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1);
+        syncRightPanel(pageNum);
+    }
+
+    function syncRightPanel(pageNum) {
+        document.querySelectorAll('.jokbo-card').forEach(card => card.classList.remove('visible'));
+        document.querySelectorAll(`.p${pageNum}-item`).forEach(card => card.classList.add('visible'));
+        
+        // 싱크 예시 (ID 기반)
+        const targetId = `chat-${pageNum}-1`;
+        const el = document.getElementById(targetId);
+        if(el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('active-context-bg');
+            setTimeout(()=>el.classList.remove('active-context-bg'), 2000);
+        }
+    }
+
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        const tabs = ['tab-chat', 'tab-jokbo', 'tab-script'];
+        document.querySelectorAll('.tab')[tabs.indexOf(tabId)].classList.add('active');
+    }
+
+    function drag(ev) { 
+        ev.dataTransfer.setData("text", ev.target.innerText); 
+    }
+    function allowDrop(ev) { ev.preventDefault(); }
+    function drop(ev) {
+        ev.preventDefault();
+        const text = ev.dataTransfer.getData("text");
+        const rect = ev.currentTarget.getBoundingClientRect();
+        const note = document.createElement("div");
+        note.className = "dropped-note editable-target"; // 생성 시에도 편집 가능 클래스 부여
+        note.setAttribute("ondblclick", "deleteNote(this)"); // 삭제 기능 부여
+        note.innerHTML = `📌 <strong>AI 메모</strong><br>${text.substring(0, 30)}...`;
+        note.style.left = (ev.clientX - rect.left) + "px"; 
+        note.style.top = (ev.clientY - rect.top) + "px";
+        
+        if(isEditing) note.contentEditable = "true"; // 현재 편집모드면 바로 편집 가능
+        
+        ev.currentTarget.appendChild(note);
+    }
+
+    // 새로고침 후 이벤트 재연결용 함수
+    function reattachEvents() {
+        // 동적 생성 요소들은 onclick 속성이 HTML에 박혀있어서 별도 처리 불필요
+        // 필요시 addEventListener 다시 거는 로직 추가
+    }
+</script>
+</body>
+</html>
+
