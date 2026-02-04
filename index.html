@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v30.0 (Interaction Perfected)</title>
+    <title>Med-Study OS v31.0 (Interaction Fix)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -49,7 +49,7 @@
         .nav-prev { left: 20px; } .nav-next { right: 20px; }
         .nav-btn.disabled { opacity: 0; pointer-events: none; }
 
-        /* [포스트잇 스타일 - 드래그 활성화] */
+        /* [포스트잇 스타일] */
         .dropped-note { 
             position: absolute; width: 220px; background-color: #fff9c4; border-left: 4px solid #fbc02d; 
             padding: 10px; font-size: 12px; color: #333; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); 
@@ -58,7 +58,6 @@
         }
         .dropped-note:active { cursor: grabbing; transform: scale(1.02); z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
         .dropped-note:hover { z-index: 60; }
-        
         .dropped-note.jokbo-note { background-color: #ffebee; border-left: 4px solid #ef5350; }
         .dropped-note.summary-note { background-color: #e8f5e9; border-left: 4px solid #43a047; } 
         .dropped-note::after { content: "🔗"; position: absolute; bottom: 5px; right: 5px; font-size: 10px; opacity: 0.5; }
@@ -68,7 +67,7 @@
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(120px);
             width: 70px; height: 70px; background: #e53935; border-radius: 50%;
             display: flex; justify-content: center; align-items: center; color: white; font-size: 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 200; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 9999; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             opacity: 0; pointer-events: none;
         }
         .trash-zone.active { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
@@ -348,15 +347,30 @@
     };
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v30')) { document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v30'); }
+        if(localStorage.getItem('medStudyData_v31')) { 
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v31'); 
+            // [중요] 저장된 데이터 복구 시 이벤트 리스너 재부착
+            restoreNoteListeners();
+        }
         changePage(0); showTab('tab-chat'); initCanvases();
         
+        // 전역 마우스 이벤트 (드래그)
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     };
     
-    document.addEventListener('input', function() { if(isEditing) localStorage.setItem('medStudyData_v30', document.getElementById('appRoot').innerHTML); });
-    function resetData() { if(confirm("초기화하시겠습니까?")) { localStorage.removeItem('medStudyData_v30'); location.reload(); } }
+    document.addEventListener('input', function() { if(isEditing) localStorage.setItem('medStudyData_v31', document.getElementById('appRoot').innerHTML); });
+    function resetData() { if(confirm("초기화하시겠습니까?")) { localStorage.removeItem('medStudyData_v31'); location.reload(); } }
+
+    /* [노트 기능 복구 (Load시 호출)] */
+    function restoreNoteListeners() {
+        const notes = document.querySelectorAll('.dropped-note');
+        notes.forEach(note => {
+            // 기존 속성 정리 및 재부착
+            note.removeAttribute('draggable'); 
+            note.onmousedown = function(e) { initDragNote(e, this); };
+        });
+    }
 
     /* [노트 드래그 로직 (Mouse Events)] */
     function initDragNote(e, note) {
@@ -454,8 +468,8 @@
         note.className = "dropped-note editable-target";
         note.id = `note-${Date.now()}`;
         
-        // 중요: 생성 시 마우스 이벤트 바인딩 (저장 후 복구를 위해 속성으로 설정)
-        note.setAttribute("onmousedown", "initDragNote(event, this)");
+        // 중요: 생성 시 마우스 이벤트 바인딩
+        note.onmousedown = function(e) { initDragNote(e, this); };
         
         const sourceId = ev.dataTransfer.getData("sourceId");
         if (sourceId) {
@@ -505,21 +519,18 @@
         } else { 
             btn.classList.remove('active'); btn.innerHTML = '✎'; body.classList.remove('editing-mode'); 
             document.querySelectorAll('.item-control-panel').forEach(el => el.remove()); 
-            // [중요] 여기서는 더이상 draggable 속성을 건드리지 않음 (마우스 이벤트로 이동하므로)
             document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => {
-                // 우측 패널 정렬 드래그 제거
                 el.removeAttribute('draggable');
                 el.removeEventListener('dragstart', handleSortStart);
                 el.removeEventListener('dragover', handleSortOver);
                 el.removeEventListener('drop', handleSortDrop);
-                // 족보 카드는 드래그 허용 복구
                 if(el.classList.contains('jokbo-card')) {
                     el.setAttribute('draggable', 'true');
                     el.setAttribute('ondragstart', "drag(event, 'jokbo')");
                 }
             });
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false"); 
-            localStorage.setItem('medStudyData_v30', document.getElementById('appRoot').innerHTML); 
+            localStorage.setItem('medStudyData_v31', document.getElementById('appRoot').innerHTML); 
             const pageNum = pages[currentPageIdx].replace('p', ''); 
             syncRightPanel(pageNum); 
         } 
@@ -548,19 +559,7 @@
     function showTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const targetTab = document.getElementById(tabId); targetTab.classList.add('active'); targetTab.style.display = 'flex'; document.querySelectorAll('.tab').forEach(el => el.classList.remove('active')); const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId); if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active'); const player = document.getElementById('audioPlayer'); if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none'; const pageNum = pages[currentPageIdx].replace('p', ''); setTimeout(() => syncRightPanel(pageNum), 50); }
     function toggleJokboList() { isJokboExpanded = !isJokboExpanded; const btn = document.getElementById('jokboExpandBtn'); btn.innerText = isJokboExpanded ? "🔼 현재 문제만 보기" : "🔽 전체 족보 보기"; const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); }
     function changePage(direction) { if (direction !== 0) { const nextIdx = currentPageIdx + direction; if (nextIdx < 0 || nextIdx >= pages.length) return; document.getElementById(pages[currentPageIdx]).classList.remove('active'); currentPageIdx = nextIdx; } const newPageId = pages[currentPageIdx]; document.getElementById(newPageId).classList.add('active'); const pageNum = newPageId.replace('p', ''); document.getElementById('headerPageNum').innerText = `Page ${pageNum} / 60`; document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0); document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1); syncRightPanel(pageNum); const canvas = document.getElementById(newPageId).querySelector('canvas'); if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; } }
-    
-    // [하이라이트 및 싱크 로직 (수정됨)]
-    function syncRightPanel(pageNum) { 
-        document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => { el.classList.remove('active-sync'); el.classList.remove('active-context-bg'); }); 
-        const targets = document.querySelectorAll(`[data-page="${pageNum}"]`); 
-        targets.forEach(el => { 
-            if(el.classList.contains('jokbo-card')) { el.classList.add('active-sync'); if (isJokboExpanded) { el.style.display = 'block'; if (document.getElementById('tab-jokbo').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else { el.style.display = 'block'; } } 
-            if(el.classList.contains('script-segment')) { el.classList.add('active-sync'); if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } 
-            if(el.classList.contains('msg-group')) { el.classList.add('active-sync'); if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } 
-        }); 
-        if (!isJokboExpanded) { document.querySelectorAll('.jokbo-card').forEach(card => { if (card.getAttribute('data-page') !== pageNum) card.style.display = 'none'; }); } 
-    }
-    
+    function syncRightPanel(pageNum) { document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => { el.classList.remove('active-sync'); el.classList.remove('active-context-bg'); }); const targets = document.querySelectorAll(`[data-page="${pageNum}"]`); targets.forEach(el => { if(el.classList.contains('jokbo-card')) { el.classList.add('active-sync'); if (isJokboExpanded) { el.style.display = 'block'; if (document.getElementById('tab-jokbo').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else { el.style.display = 'block'; } } if(el.classList.contains('script-segment')) { el.classList.add('active-sync'); if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } if(el.classList.contains('msg-group')) { el.classList.add('active-sync'); if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }); if (!isJokboExpanded) { document.querySelectorAll('.jokbo-card').forEach(card => { if (card.getAttribute('data-page') !== pageNum) card.style.display = 'none'; }); } }
     function focusChat(pageNum) { showTab('tab-chat'); changePage(0); changePage(pageNum - 13); }
 </script>
 </body>
