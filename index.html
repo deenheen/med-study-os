@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v15.0 (Select & Drag Text)</title>
+    <title>Med-Study OS v16.0 (Tab Visibility Fixed)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -48,9 +48,15 @@
         .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; flex-shrink: 0; height: 50px; }
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 600; color: #888; font-size: 14px; transition: 0.2s; }
         .tab.active { color: #2196f3; border-bottom: 3px solid #2196f3; background: #fff; }
+        
+        /* 탭 컨텐츠 영역 */
         .tab-content-container { flex: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; display: flex; flex-direction: column; }
-        .tab-content { display: none; padding: 20px; padding-bottom: 100px; flex: 1; flex-direction: column; }
-        .tab-content.active { display: flex; }
+        
+        /* [중요] 탭 컨텐츠 기본적으로 숨김 처리 */
+        .tab-content { display: none !important; padding: 20px; padding-bottom: 100px; flex: 1; flex-direction: column; }
+        
+        /* [중요] 활성화된 탭만 보임 */
+        .tab-content.active { display: flex !important; }
 
         /* 1. 채팅 스타일 */
         .chat-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 16px; }
@@ -59,7 +65,6 @@
         .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
         .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
         .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
-        /* 중요: AI 버블에서 드래그 속성 제거 (텍스트 선택 드래그를 위해) */
         .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: text; user-select: text; }
         .chat-input-area { height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
@@ -67,7 +72,6 @@
 
         /* 2. 족보 스타일 */
         .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; }
-        /* 족보는 카드 자체가 드래그 가능 */
         .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; outline: none; transition: transform 0.2s, opacity 0.3s; cursor: grab; opacity: 0.8; }
         .jokbo-card:hover { opacity: 1; border-color: #bbb; }
         .jokbo-card.active-sync { opacity: 1; border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2); background: #f4faff; transform: scale(1.02); }
@@ -225,23 +229,55 @@
     let dragSrcEl = null;
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v15')) {
-            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v15');
+        if(localStorage.getItem('medStudyData_v16')) {
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v16');
         }
         changePage(0);
+        showTab('tab-chat'); // 초기 탭 설정
     };
 
     document.addEventListener('input', function() {
-        if(isEditing) localStorage.setItem('medStudyData_v15', document.getElementById('appRoot').innerHTML);
+        if(isEditing) localStorage.setItem('medStudyData_v16', document.getElementById('appRoot').innerHTML);
     });
 
     function resetData() {
         if(confirm("초기화하시겠습니까?")) {
-            localStorage.removeItem('medStudyData_v15');
+            localStorage.removeItem('medStudyData_v16');
             location.reload();
         }
     }
 
+    // [탭 제어 - 버그 수정 핵심 파트]
+    function showTab(tabId) {
+        // 1. 모든 탭 컨텐츠 숨기기 (JS에서 강제)
+        document.querySelectorAll('.tab-content').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none'; // 강제 숨김
+        });
+        
+        // 2. 선택된 탭만 보이기
+        const targetTab = document.getElementById(tabId);
+        targetTab.classList.add('active');
+        targetTab.style.display = 'flex'; // 강제 보임
+        
+        // 3. 상단 탭 버튼 스타일 업데이트
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        // tab-chat: 0, tab-jokbo: 1, tab-script: 2
+        const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId);
+        if(document.querySelectorAll('.tab')[tabIndex]) {
+            document.querySelectorAll('.tab')[tabIndex].classList.add('active');
+        }
+        
+        // 4. 오디오 플레이어 제어 (스크립트 탭일 때만 표시)
+        const player = document.getElementById('audioPlayer');
+        if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none';
+
+        // 5. 싱크 맞추기
+        const pageNum = pages[currentPageIdx].replace('p', '');
+        setTimeout(() => syncRightPanel(pageNum), 50);
+    }
+
+    // [편집 모드 제어]
     function toggleEditMode() {
         isEditing = !isEditing;
         const btn = document.getElementById('editToggleBtn');
@@ -260,13 +296,12 @@
             body.classList.remove('editing-mode');
             document.querySelectorAll('.item-control-panel').forEach(el => el.remove());
             
-            // 편집모드 종료 시 드래그 속성 정리 (정렬 드래그 제거)
+            // 드래그 속성 클린업
             document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => {
                 el.removeAttribute('draggable');
                 el.removeEventListener('dragstart', handleSortStart);
                 el.removeEventListener('dragover', handleSortOver);
                 el.removeEventListener('drop', handleSortDrop);
-                // 족보는 카드 드래그 복구
                 if(el.classList.contains('jokbo-card')) {
                     el.setAttribute('draggable', 'true');
                     el.setAttribute('ondragstart', "drag(event, 'jokbo')");
@@ -274,7 +309,7 @@
             });
 
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false");
-            localStorage.setItem('medStudyData_v15', document.getElementById('appRoot').innerHTML);
+            localStorage.setItem('medStudyData_v16', document.getElementById('appRoot').innerHTML);
             const pageNum = pages[currentPageIdx].replace('p', '');
             syncRightPanel(pageNum);
         }
@@ -295,13 +330,12 @@
         el.insertBefore(panel, el.firstChild);
     }
 
-    // [클릭 싱크 (Deep Link)]
+    // [클릭 싱크]
     function handleClickSync(el) {
         if (isEditing) return;
         const targetPage = el.getAttribute('data-page');
         if (!targetPage) return;
         const targetIdx = parseInt(targetPage) - 13;
-        
         if (targetIdx >= 0 && targetIdx < pages.length) {
             document.getElementById(pages[currentPageIdx]).classList.remove('active');
             currentPageIdx = targetIdx;
@@ -316,7 +350,7 @@
         }
     }
 
-    // [정렬 드래그 (편집 모드용)]
+    // [정렬 드래그]
     function enableSortDrag(handle) {
         const item = handle.closest('.msg-group, .jokbo-card, .script-segment');
         item.setAttribute('draggable', 'true');
@@ -343,7 +377,6 @@
         this.removeEventListener('dragstart', handleSortStart);
         this.removeEventListener('dragover', handleSortOver);
         this.removeEventListener('drop', handleSortDrop);
-        // 족보는 일반 드래그 복구
         if(this.classList.contains('jokbo-card')) {
              this.setAttribute('draggable', 'true');
              this.setAttribute('ondragstart', "drag(event, 'jokbo')");
@@ -352,35 +385,19 @@
 
     // [일반 드래그 (Drop to PDF)]
     function drag(ev, type) { 
-        // 텍스트 선택 드래그인지 확인 (selection이 있으면 브라우저가 알아서 처리하게 둠)
         const selection = window.getSelection().toString();
-        if (selection && selection.length > 0) {
-            // 선택된 텍스트가 있으면 브라우저 기본 동작 사용 (text/plain 드래그)
-            // type 정보만 추가로 심어줌
-            ev.dataTransfer.setData("type", type || 'text');
-            return; 
-        }
-
-        // 선택된 텍스트가 없으면 요소 드래그 (족보 등)
-        if(type === 'jokbo') {
-            ev.dataTransfer.setData("text", ev.target.innerText); 
-            ev.dataTransfer.setData("type", 'jokbo');
-        }
+        if (selection && selection.length > 0) { ev.dataTransfer.setData("type", type || 'text'); return; }
+        if(type === 'jokbo') { ev.dataTransfer.setData("text", ev.target.innerText); ev.dataTransfer.setData("type", 'jokbo'); }
     }
-    
     function allowDrop(ev) { ev.preventDefault(); }
-    
     function drop(ev) {
         ev.preventDefault();
-        // 정렬 드래그 무시
         if (ev.dataTransfer.getData('sort-type')) return;
-
         const rect = ev.currentTarget.getBoundingClientRect();
         const note = document.createElement("div");
         note.className = "dropped-note editable-target";
         note.setAttribute("ondblclick", "deleteNote(this)");
         
-        // 1. 족보 카드 드래그인 경우
         const type = ev.dataTransfer.getData("type");
         if (type === 'jokbo') {
             const text = ev.dataTransfer.getData("text");
@@ -388,16 +405,11 @@
             const lines = text.split('\n');
             const qLine = lines.find(l => l.includes('Q.')) || text;
             note.innerHTML = `📌 <strong>족보 연결</strong><br>${qLine.substring(0, 35)}...`;
-        } 
-        // 2. 텍스트 선택 드래그인 경우 (AI 답변 등)
-        else {
-            // 브라우저에서 드롭된 텍스트 가져오기
+        } else {
             const text = ev.dataTransfer.getData("text/plain");
-            if (!text) return; // 텍스트 없으면 종료
-            
+            if (!text) return;
             note.innerHTML = `📌 <strong>AI 메모</strong><br>${text.substring(0, 30)}...`;
         }
-
         note.style.left = (ev.clientX - rect.left) + "px"; 
         note.style.top = (ev.clientY - rect.top) + "px";
         if(isEditing) note.contentEditable = "true";
@@ -452,20 +464,6 @@
                 el.querySelector('.ai-msg').classList.add('active-context-bg'); el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         });
-    }
-
-    function showTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        const targetTab = document.getElementById(tabId);
-        targetTab.classList.add('active');
-        if(tabId === 'tab-chat') { targetTab.style.display = 'flex'; targetTab.style.flexDirection = 'column'; } 
-        else { targetTab.style.display = 'flex'; }
-        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab')[['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId)].classList.add('active');
-        const player = document.getElementById('audioPlayer');
-        if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none';
-        const pageNum = pages[currentPageIdx].replace('p', '');
-        setTimeout(() => syncRightPanel(pageNum), 100);
     }
 
     function focusChat(pageNum) { showTab('tab-chat'); changePage(0); changePage(pageNum - 13); }
