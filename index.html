@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v27.0 (Native Drag & Trash)</title>
+    <title>Med-Study OS v29.0 (Final Interaction Fix)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
-        body { background-color: #f0f2f5; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        body { background-color: #f0f2f5; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; user-select: none; }
 
         /* [메인 프레임] */
         .tablet-frame { width: 1600px; height: 950px; background: white; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); border: 1px solid #ddd; display: flex; overflow: hidden; position: relative; }
@@ -30,8 +30,7 @@
         .pdf-page.active { display: flex; animation: fadeIn 0.2s ease-out; }
         .drawing-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
         .pen-mode .drawing-canvas { pointer-events: auto; cursor: crosshair; }
-        .pen-mode .text-body, .pen-mode .dropped-note { user-select: none; }
-
+        
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
         /* PDF 스타일 */
@@ -45,24 +44,19 @@
         .info-box { background: #f5f9ff; border: 1px solid #b3e5fc; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #0277bd; outline: none; }
         .warn-box { background: #fff5f5; border: 1px solid #ffcdd2; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #c62828; font-weight: 600; outline: none; }
 
-        /* 네비게이션 버튼 */
+        /* 네비게이션 */
         .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 20px; z-index: 100; transition: 0.2s; }
-        .nav-btn:hover { background: rgba(0,0,0,0.8); }
         .nav-prev { left: 20px; } .nav-next { right: 20px; }
         .nav-btn.disabled { opacity: 0; pointer-events: none; }
 
-        /* [포스트잇 - 상시 드래그 가능] */
+        /* [포스트잇 스타일] */
         .dropped-note { 
             position: absolute; width: 220px; background-color: #fff9c4; border-left: 4px solid #fbc02d; 
             padding: 10px; font-size: 12px; color: #333; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); 
-            border-radius: 0 6px 6px 0; outline: none; 
-            transition: box-shadow 0.2s, transform 0.1s;
-            cursor: grab; /* 항상 드래그 가능 커서 */
-            z-index: 50;
+            border-radius: 0 6px 6px 0; cursor: move; z-index: 50; line-height: 1.4; outline: none; 
+            transition: transform 0.1s, box-shadow 0.2s;
         }
         .dropped-note:hover { z-index: 60; transform: scale(1.02); }
-        .dropped-note:active { cursor: grabbing; box-shadow: 0 8px 20px rgba(0,0,0,0.3); z-index: 100; }
-        
         .dropped-note.jokbo-note { background-color: #ffebee; border-left: 4px solid #ef5350; }
         .dropped-note.summary-note { background-color: #e8f5e9; border-left: 4px solid #43a047; } 
         .dropped-note::after { content: "🔗"; position: absolute; bottom: 5px; right: 5px; font-size: 10px; opacity: 0.5; }
@@ -70,8 +64,8 @@
         /* [휴지통 영역] */
         .trash-zone {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
-            width: 60px; height: 60px; background: #e53935; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center; color: white; font-size: 30px;
+            width: 70px; height: 70px; background: #e53935; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; color: white; font-size: 35px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 200; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             opacity: 0; pointer-events: none;
         }
@@ -88,23 +82,23 @@
         .tab-content { display: none !important; padding: 20px; padding-bottom: 100px; flex: 1; flex-direction: column; }
         .tab-content.active { display: flex !important; }
 
-        /* 채팅 스타일 */
+        /* [채팅 스타일] */
         .chat-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 16px; }
-        .msg-group { display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 8px; cursor: pointer; transition: all 0.3s; opacity: 0.5; filter: grayscale(80%); }
-        .msg-group:hover, .msg-group.active-sync { opacity: 1; filter: grayscale(0%); }
+        .msg-group { display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .msg-group:hover { background-color: rgba(33, 150, 243, 0.05); } 
+        /* 하이라이트 복구: 테두리와 배경색 */
+        .msg-group.active-sync { border: 1px solid #2196f3; background-color: #f0f7ff; }
+        
         .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
         .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
         .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
         .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: text; user-select: text; padding-right: 30px; position: relative; }
         .bubble-drag-handle { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; display: flex; justify-content: center; align-items: center; cursor: grab; opacity: 0.3; transition: 0.2s; font-size: 14px; }
         .ai-msg:hover .bubble-drag-handle { opacity: 1; }
-        .chat-input-area { height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
-        .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
-
-        /* 족보 스타일 */
+        
+        /* [족보 스타일] */
         .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 5px; outline: none; cursor: grab; display: none; position: relative; }
+        .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 5px; outline: none; cursor: grab; display: none; }
         .jokbo-card.active-sync { display: block; border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.1); background: #f4faff; animation: slideInRight 0.3s; }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .badge { display: inline-block; padding: 3px 8px; font-size: 11px; border-radius: 4px; font-weight: 700; margin-right: 6px; outline: none; }
@@ -120,9 +114,6 @@
         .answer-box { background: #fff8e1; border: 1px solid #ffecb3; color: #5d4037; }
         .analysis-box { background: #fafafa; border: 1px solid #eee; border-left: 3px solid #7b1fa2; color: #444; }
         .card-close-btn { position: absolute; top: 10px; right: 10px; font-size: 16px; color: #999; cursor: pointer; }
-        .card-close-btn:hover { color: #f44336; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-        
         .jokbo-action-bar { margin-top: auto; border-top: 1px solid #eee; padding: 15px; background: white; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
         .action-row { display: flex; gap: 8px; }
         .ai-action-btn { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 12px; font-weight: 700; color: #444; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
@@ -135,11 +126,12 @@
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(33, 150, 243, 0.3); border-radius: 50%; border-top-color: #2196f3; animation: spin 1s ease-in-out infinite; margin-bottom: 5px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* 3. 스크립트 스타일 */
+        /* [스크립트 스타일] */
         .script-list-area { flex: 1; overflow-y: auto; padding-bottom: 80px; }
-        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; transition: transform 0.2s, opacity 0.3s; opacity: 0.4; cursor: text; }
-        .script-segment:hover { opacity: 0.8; }
-        .script-segment.active-sync { opacity: 1; border-left: 5px solid #2196f3; background: #fbfdff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; cursor: text; transition: all 0.3s; }
+        .script-segment:hover { border-color: #bbb; }
+        /* 하이라이트 복구 */
+        .script-segment.active-sync { border-left: 5px solid #2196f3; background: #fbfdff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .script-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: #888; }
         .script-text { font-size: 14px; line-height: 1.6; color: #333; outline: none; }
         .audio-player-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 75px; background: white; border-top: 1px solid #ddd; display: flex; align-items: center; padding: 0 20px; gap: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); display: none; z-index: 200; }
@@ -161,6 +153,10 @@
         .ctrl-btn { cursor: pointer; background: #555; border: none; color: white; width: 20px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
         .page-input { width: 30px; background: #444; border: 1px solid #666; color: white; text-align: center; border-radius: 3px; }
         .sortable-ghost { opacity: 0.4; background: #e3f2fd; border: 2px dashed #2196f3; }
+        
+        .chat-input-area { height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
+        .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -200,8 +196,9 @@
                 <canvas class="drawing-canvas"></canvas>
                 <div class="slide-header"><div class="slide-title editable-target">Diabetic Ketoacidosis (DKA)</div><div class="slide-sub editable-target">Endocrinology Part.4</div></div>
                 <div class="content-block"><div class="section-title editable-target">1. Definition & Epidemiology</div><p class="text-body editable-target">인슐린의 절대적 결핍과 대항 호르몬의 증가로 발생하는 급성 대사 합병증.</p></div>
+                
                 <div class="dropped-note editable-target" id="note-demo-1" style="top:400px; left:450px;" 
-                     draggable="true" ondragstart="dragNote(event)" onclick="handleNoteClick('chat-13-1')">
+                     onmousedown="initDragNote(event, this)" onclick="handleNoteClick('chat-13-1')">
                     📌 AI: 병태생리 핵심
                 </div>
             </div>
@@ -218,7 +215,7 @@
                 <div class="info-box editable-target">★ Kussmaul Respiration: 과일 냄새.</div>
             </div>
             
-            <div class="trash-zone" id="trashZone" ondragover="allowDropTrash(event)" ondrop="dropTrash(event)">🗑️</div>
+            <div class="trash-zone" id="trashZone">🗑️</div>
         </div>
     </div>
 
@@ -337,6 +334,12 @@
     let isDrawing = false;
     let ctx = null; let lastX = 0; let lastY = 0;
 
+    // [노트 드래그 변수]
+    let activeNote = null;
+    let noteOffsetX = 0;
+    let noteOffsetY = 0;
+    let hasMoved = false; // [Fix] 클릭 vs 드래그 구분용 플래그
+
     const aiData = {
         '13': { summary: "• 인슐린 결핍 + 길항 호르몬(Glucagon 등) 증가\n• 지방분해 가속 → 케톤체 생성 → 대사성 산증", twin: { q: "Q. (변형) DKA 병태생리에서 유리지방산 산화를 촉진하는 장기는?", a: "① 간  ② 근육  ③ 지방", ans: "<strong>[정답] ① 간</strong><br>지방조직에서 분해된 지방산이 '간'으로 이동해 케톤체로 바뀝니다." } },
         '14': { summary: "• 쿠스마울 호흡: 산증 보상 (CO2 배출)\n• 복통: 급성 복증과 감별 필요", twin: { q: "Q. (변형) 호흡수 35회, 깊은 호흡을 보이는 복통 환자. 우선 시행할 검사는?", a: "① 복부 CT  ② 혈당/케톤  ③ 내시경", ans: "<strong>[정답] ② 혈당/케톤</strong><br>DKA 가능성이 높으므로 혈당과 케톤을 먼저 확인해야 합니다." } },
@@ -344,53 +347,100 @@
     };
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v27')) { document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v27'); }
+        if(localStorage.getItem('medStudyData_v29')) { document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v29'); }
         changePage(0); showTab('tab-chat'); initCanvases();
-    };
-    document.addEventListener('input', function() { if(isEditing) localStorage.setItem('medStudyData_v27', document.getElementById('appRoot').innerHTML); });
-    function resetData() { if(confirm("초기화하시겠습니까?")) { localStorage.removeItem('medStudyData_v27'); location.reload(); } }
-
-    /* [노트 드래그 & 휴지통] */
-    // 1. 노트 드래그 시작 (상시 작동)
-    function dragNote(ev) {
-        // 편집모드일 때만 텍스트 선택 허용 안함 (드래그 우선)
-        // 뷰어 모드일 때는 텍스트 선택이 우선일 수도 있으나, 여기선 노트 자체를 드래그하게 설정
-        ev.dataTransfer.setData("type", "move_note");
-        ev.dataTransfer.setData("noteId", ev.target.id);
-        const rect = ev.target.getBoundingClientRect();
-        ev.dataTransfer.setData("offsetX", ev.clientX - rect.left);
-        ev.dataTransfer.setData("offsetY", ev.clientY - rect.top);
         
-        // 휴지통 표시
-        document.getElementById('trashZone').classList.add('active');
-    }
-
-    function endDragNote(ev) {
-        document.getElementById('trashZone').classList.remove('active');
-    }
-
-    // 2. 휴지통 드롭
-    function allowDropTrash(ev) { 
-        ev.preventDefault();
-        document.getElementById('trashZone').classList.add('drag-over');
-    }
+        // 전역 마우스 이벤트 바인딩 (드래그용)
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    };
     
-    function dropTrash(ev) {
-        ev.preventDefault();
-        document.getElementById('trashZone').classList.remove('drag-over');
-        const noteId = ev.dataTransfer.getData("noteId");
-        const note = document.getElementById(noteId);
-        if (note) note.remove();
+    document.addEventListener('input', function() { if(isEditing) localStorage.setItem('medStudyData_v29', document.getElementById('appRoot').innerHTML); });
+    function resetData() { if(confirm("초기화하시겠습니까?")) { localStorage.removeItem('medStudyData_v29'); location.reload(); } }
+
+    /* [노트 드래그 & 클릭 구분 로직] */
+    function initDragNote(e, note) {
+        if (currentTool !== 'cursor') return; 
+        if (isEditing && e.target.isContentEditable) return; 
+
+        // 텍스트 선택 방지 (드래그 우선)
+        e.preventDefault(); 
+        
+        activeNote = note;
+        hasMoved = false; // 초기화
+        
+        const rect = note.getBoundingClientRect();
+        // 마우스와 노트 왼쪽 상단 사이의 거리 저장
+        noteOffsetX = e.clientX - rect.left;
+        noteOffsetY = e.clientY - rect.top;
+        
+        // 휴지통 보이기
+        document.getElementById('trashZone').classList.add('active');
+        note.style.zIndex = 1000;
     }
 
-    // 3. 외부 드래그 (채팅/족보)
+    function onMouseMove(e) {
+        if (!activeNote) return;
+        
+        hasMoved = true; // 움직임 감지됨
+        
+        const pdfPage = activeNote.parentElement;
+        const pageRect = pdfPage.getBoundingClientRect();
+        
+        let newLeft = e.clientX - pageRect.left - noteOffsetX;
+        let newTop = e.clientY - pageRect.top - noteOffsetY;
+        
+        activeNote.style.left = newLeft + 'px';
+        activeNote.style.top = newTop + 'px';
+        
+        // 휴지통 감지
+        const trash = document.getElementById('trashZone');
+        const trashRect = trash.getBoundingClientRect();
+        if (e.clientX >= trashRect.left && e.clientX <= trashRect.right &&
+            e.clientY >= trashRect.top && e.clientY <= trashRect.bottom) {
+            trash.classList.add('drag-over');
+        } else {
+            trash.classList.remove('drag-over');
+        }
+    }
+
+    function onMouseUp(e) {
+        if (!activeNote) return;
+        
+        const trash = document.getElementById('trashZone');
+        // 휴지통 삭제 로직
+        if (trash.classList.contains('drag-over')) {
+            if(confirm("이 메모를 삭제하시겠습니까?")) activeNote.remove();
+        }
+        
+        trash.classList.remove('active');
+        trash.classList.remove('drag-over');
+        activeNote.style.zIndex = 50; 
+        
+        // 중요: hasMoved 상태를 유지하기 위해 activeNote만 null 처리 (클릭 이벤트에서 확인)
+        // 클릭 이벤트 핸들러가 실행될 때 activeNote는 null이지만, hasMoved 플래그는 유효해야 함.
+        // 하지만 activeNote가 null이 되면 hasMoved를 어디서 확인할까?
+        // -> handleNoteClick에서 전역 hasMoved를 확인하고, 
+        // 여기서 activeNote = null 처리
+        setTimeout(() => { activeNote = null; }, 0); // 이벤트 루프 뒤로 미룸
+    }
+
+    function handleNoteClick(sourceId) {
+        // [Fix] 움직였으면 클릭(이동) 취소
+        if (hasMoved) {
+            hasMoved = false; // 리셋
+            return;
+        }
+        if (isEditing) return; 
+        jumpToSource(sourceId);
+    }
+
+    /* [기존 생성용 드래그] */
     function drag(ev, type) { 
         const selection = window.getSelection().toString();
         if (selection && selection.length > 0) { ev.dataTransfer.setData("type", 'text'); }
-        
         const container = ev.target.closest('[id]');
         if (container) ev.dataTransfer.setData("sourceId", container.id);
-
         if (type === 'ai') {
             const bubble = ev.target.closest('.ai-msg');
             const text = bubble.innerText.replace("📌", "").trim();
@@ -398,46 +448,28 @@
             ev.dataTransfer.setData("type", 'ai_bubble');
             return;
         }
-        if(type === 'jokbo') { 
-            ev.dataTransfer.setData("text", ev.target.innerText); 
-            ev.dataTransfer.setData("type", 'jokbo'); 
-        }
+        if(type === 'jokbo') { ev.dataTransfer.setData("text", ev.target.innerText); ev.dataTransfer.setData("type", 'jokbo'); }
     }
     
     function allowDrop(ev) { ev.preventDefault(); }
     
-    // 4. 메인 드롭 처리
     function drop(ev) {
         ev.preventDefault();
-        document.getElementById('trashZone').classList.remove('active'); // 드롭 시 휴지통 숨김
-        
         if (ev.dataTransfer.getData('sort-type')) return;
 
-        // A. 노트 이동
-        const moveType = ev.dataTransfer.getData("type");
-        if (moveType === 'move_note') {
-            const noteId = ev.dataTransfer.getData("noteId");
-            const note = document.getElementById(noteId);
-            if (!note) return;
+        // 드래그된 텍스트/데이터가 없으면 무시 (노트 이동은 onMouseUp에서 처리됨)
+        // 하지만 HTML5 Drop은 노트 이동과 관련 없음 (노트 이동은 Mouse Event로 처리)
+        
+        const type = ev.dataTransfer.getData("type");
+        if (!type && !ev.dataTransfer.getData("text")) return;
 
-            const offsetX = parseFloat(ev.dataTransfer.getData("offsetX"));
-            const offsetY = parseFloat(ev.dataTransfer.getData("offsetY"));
-            const pageRect = ev.currentTarget.getBoundingClientRect();
-
-            note.style.left = (ev.clientX - pageRect.left - offsetX) + 'px';
-            note.style.top = (ev.clientY - pageRect.top - offsetY) + 'px';
-            return;
-        }
-
-        // B. 새 노트 생성
         const rect = ev.currentTarget.getBoundingClientRect();
         const note = document.createElement("div");
         note.className = "dropped-note editable-target";
         note.id = `note-${Date.now()}`;
-        // 드래그 속성 부여 (상시)
-        note.setAttribute('draggable', 'true');
-        note.setAttribute('ondragstart', 'dragNote(event)');
-        note.setAttribute('ondragend', 'endDragNote(event)');
+        
+        // 생성된 노트에도 마우스 이벤트 연결
+        note.onmousedown = function(e) { initDragNote(e, this); };
         
         const sourceId = ev.dataTransfer.getData("sourceId");
         if (sourceId) {
@@ -446,9 +478,8 @@
         }
 
         const textData = ev.dataTransfer.getData("text") || ev.dataTransfer.getData("text/plain");
-        const type = ev.dataTransfer.getData("type");
-
         let contentHtml = "";
+        
         if (type === 'jokbo') {
             note.classList.add('jokbo-note');
             const cleanText = textData.replace('🤖 AI 핵심 요약', '').replace('🔄 AI 쌍둥이 문제', '').trim();
@@ -475,27 +506,21 @@
     }
 
     /* [기타 기능들] */
-    function handleNoteClick(sourceId) { if (isEditing) return; jumpToSource(sourceId); }
     function jumpToSource(sourceId) { if (!sourceId) return; if (sourceId.includes('chat')) showTab('tab-chat'); else if (sourceId.includes('jokbo')) showTab('tab-jokbo'); else if (sourceId.includes('script')) showTab('tab-script'); setTimeout(() => { const el = document.getElementById(sourceId); if(el) { if(el.style.display === 'none') { const page = el.getAttribute('data-page'); if (page) { const targetIdx = parseInt(page) - 13; if (targetIdx !== currentPageIdx) changePage(targetIdx - currentPageIdx); } } el.scrollIntoView({ behavior: 'smooth', block: 'center' }); if(el.classList.contains('msg-group')) { el.querySelector('.ai-msg').classList.add('deep-link-highlight'); setTimeout(() => el.querySelector('.ai-msg').classList.remove('deep-link-highlight'), 1500); } else { el.classList.add('deep-link-highlight'); setTimeout(() => el.classList.remove('deep-link-highlight'), 1500); } } }, 150); }
-    function toggleEditMode() { isEditing = !isEditing; const btn = document.getElementById('editToggleBtn'); const body = document.body; if(isEditing) { btn.classList.add('active'); btn.innerHTML = '💾'; body.classList.add('editing-mode'); const targets = document.querySelectorAll('.msg-group, .jokbo-card, .script-segment'); targets.forEach(el => injectControls(el)); document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "true"); } else { btn.classList.remove('active'); btn.innerHTML = '✎'; body.classList.remove('editing-mode'); document.querySelectorAll('.item-control-panel').forEach(el => el.remove()); document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => { el.removeAttribute('draggable'); el.removeEventListener('dragstart', handleSortStart); el.removeEventListener('dragover', handleSortOver); el.removeEventListener('drop', handleSortDrop); if(el.classList.contains('jokbo-card')) { el.setAttribute('draggable', 'true'); el.setAttribute('ondragstart', "drag(event, 'jokbo')"); } }); document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false"); localStorage.setItem('medStudyData_v27', document.getElementById('appRoot').innerHTML); const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); } }
+    function toggleEditMode() { isEditing = !isEditing; const btn = document.getElementById('editToggleBtn'); const body = document.body; if(isEditing) { btn.classList.add('active'); btn.innerHTML = '💾'; body.classList.add('editing-mode'); const targets = document.querySelectorAll('.msg-group, .jokbo-card, .script-segment'); targets.forEach(el => injectControls(el)); document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "true"); } else { btn.classList.remove('active'); btn.innerHTML = '✎'; body.classList.remove('editing-mode'); document.querySelectorAll('.item-control-panel').forEach(el => el.remove()); document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => { el.removeAttribute('draggable'); el.removeEventListener('dragstart', handleSortStart); el.removeEventListener('dragover', handleSortOver); el.removeEventListener('drop', handleSortDrop); if(el.classList.contains('jokbo-card')) { el.setAttribute('draggable', 'true'); el.setAttribute('ondragstart', "drag(event, 'jokbo')"); } }); document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false"); localStorage.setItem('medStudyData_v29', document.getElementById('appRoot').innerHTML); const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); } }
     function injectControls(el) { if(el.querySelector('.item-control-panel')) return; const page = el.getAttribute('data-page') || '0'; const panel = document.createElement('div'); panel.className = 'item-control-panel'; panel.contentEditable = "false"; panel.innerHTML = `<span class="drag-handle" onmousedown="enableSortDrag(this)">⠿</span><span>Page:</span> <input type="text" class="page-input" value="${page}" onchange="updatePage(this)"><button class="ctrl-btn add" onclick="addItem(this)">+</button><button class="ctrl-btn del" onclick="deleteItem(this)">🗑️</button>`; el.insertBefore(panel, el.firstChild); }
-    function updatePage(input) { input.closest('.msg-group, .jokbo-card, .script-segment').setAttribute('data-page', input.value); const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); }
-    function deleteItem(btn) { if(confirm('삭제?')) btn.closest('.msg-group, .jokbo-card, .script-segment').remove(); }
-    function addItem(btn) { const item = btn.closest('.msg-group, .jokbo-card, .script-segment'); const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script'; let newItem = item.cloneNode(true); if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; newItem.id = `chat-${Date.now()}`; const aiMsg = newItem.querySelector('.ai-msg'); aiMsg.childNodes[0].nodeValue = "답변"; } else if(type === 'jokbo') { newItem.querySelector('.q-body').innerText = '문제'; newItem.id = `jokbo-${Date.now()}`; const box = newItem.querySelector('.analysis-box'); if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; } newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석'; const ansBox = newItem.querySelector('.answer-box'); if(ansBox) { ansBox.style.display = 'none'; ansBox.querySelector('.editable-target').innerText = '정답 및 해설'; } newItem.querySelector('.ans-btn').innerText = '💡 정답 및 해설'; } else { newItem.querySelector('.script-text').innerText = '내용'; newItem.id = `script-${Date.now()}`; } item.after(newItem); newItem.querySelector('.item-control-panel').remove(); injectControls(newItem); }
-    function generateSummary() { const pageNum = pages[currentPageIdx].replace('p', ''); const existing = document.getElementById(`ai-sum-${pageNum}`); if(existing) { existing.style.display = existing.style.display === 'none' ? 'block' : 'none'; return; } const data = aiData[pageNum]; if(!data) return alert("데이터 없음"); const loading = document.getElementById('aiLoading'); loading.style.display = 'block'; loading.scrollIntoView({ behavior: 'smooth' }); setTimeout(() => { loading.style.display = 'none'; const list = document.getElementById('jokboList'); const newCard = document.createElement('div'); newCard.className = 'jokbo-card active-sync'; newCard.id = `ai-sum-${pageNum}`; newCard.setAttribute('data-page', pageNum); newCard.setAttribute('draggable', 'true'); newCard.setAttribute('ondragstart', "drag(event, 'jokbo')"); newCard.onclick = function() { handleClickSync(this); }; newCard.style.display = 'block'; newCard.style.border = '2px solid #66bb6a'; newCard.style.background = '#f1f8e9'; newCard.innerHTML = `<div class="badge-row"><span class="badge ai-new">🤖 AI 핵심 요약</span></div><div class="card-close-btn" onclick="this.parentElement.style.display='none'; event.stopPropagation();">×</div><div class="q-body editable-target" style="white-space: pre-line;">${data.summary}</div><div class="jokbo-footer" style="color:#2e7d32; font-size:11px;">* 자동 생성됨</div>`; list.insertBefore(newCard, loading); newCard.scrollIntoView({ behavior: 'smooth' }); }, 1000); }
-    function generateTwinProblem() { const pageNum = pages[currentPageIdx].replace('p', ''); const existing = document.getElementById(`ai-twin-${pageNum}`); if(existing) { existing.style.display = existing.style.display === 'none' ? 'block' : 'none'; return; } const data = aiData[pageNum]; if(!data) return alert("데이터 없음"); const loading = document.getElementById('aiLoading'); loading.style.display = 'block'; loading.scrollIntoView({ behavior: 'smooth' }); setTimeout(() => { loading.style.display = 'none'; const list = document.getElementById('jokboList'); const newCard = document.createElement('div'); newCard.className = 'jokbo-card active-sync'; newCard.id = `ai-twin-${pageNum}`; newCard.setAttribute('data-page', pageNum); newCard.setAttribute('draggable', 'true'); newCard.setAttribute('ondragstart', "drag(event, 'jokbo')"); newCard.onclick = function() { handleClickSync(this); }; newCard.style.display = 'block'; newCard.innerHTML = `<div class="badge-row"><span class="badge ai-new">🔄 AI 쌍둥이 문제</span></div><div class="card-close-btn" onclick="this.parentElement.style.display='none'; event.stopPropagation();">×</div><div class="q-body editable-target">${data.twin.q}</div><div class="q-options editable-target">${data.twin.a}</div><div class="jokbo-footer"><button class="card-btn ans-btn" onclick="toggleAnswer(event, this)">💡 정답 및 해설</button></div><div class="hidden-box answer-box"><div class="editable-target">${data.twin.ans}</div></div>`; list.insertBefore(newCard, loading); newCard.scrollIntoView({ behavior: 'smooth' }); }, 1000); }
     function enableSortDrag(handle) { const item = handle.closest('.msg-group, .jokbo-card, .script-segment'); item.setAttribute('draggable', 'true'); item.addEventListener('dragstart', handleSortStart); item.addEventListener('dragover', handleSortOver); item.addEventListener('drop', handleSortDrop); item.addEventListener('dragend', handleSortEnd); }
     function handleSortStart(e) { dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('sort-type', 'true'); this.classList.add('sortable-ghost'); }
     function handleSortOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
     function handleSortDrop(e) { e.stopPropagation(); if (!e.dataTransfer.getData('sort-type')) return false; if (dragSrcEl !== this) { const rect = this.getBoundingClientRect(); if(e.clientY < rect.top + (rect.height / 2)) this.parentNode.insertBefore(dragSrcEl, this); else this.parentNode.insertBefore(dragSrcEl, this.nextSibling); } return false; }
     function handleSortEnd(e) { this.classList.remove('sortable-ghost'); this.removeAttribute('draggable'); this.removeEventListener('dragstart', handleSortStart); this.removeEventListener('dragover', handleSortOver); this.removeEventListener('drop', handleSortDrop); if(this.classList.contains('jokbo-card')) { this.setAttribute('draggable', 'true'); this.setAttribute('ondragstart', "drag(event, 'jokbo')"); } }
+    function updatePage(input) { input.closest('.msg-group, .jokbo-card, .script-segment').setAttribute('data-page', input.value); const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); }
+    function deleteItem(btn) { if(confirm('삭제?')) btn.closest('.msg-group, .jokbo-card, .script-segment').remove(); }
+    function addItem(btn) { const item = btn.closest('.msg-group, .jokbo-card, .script-segment'); const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script'; let newItem = item.cloneNode(true); if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; newItem.id = `chat-${Date.now()}`; const aiMsg = newItem.querySelector('.ai-msg'); aiMsg.childNodes[0].nodeValue = "답변"; } else if(type === 'jokbo') { newItem.querySelector('.q-body').innerText = '문제'; newItem.id = `jokbo-${Date.now()}`; const box = newItem.querySelector('.analysis-box'); if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; } newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석'; const ansBox = newItem.querySelector('.answer-box'); if(ansBox) { ansBox.style.display = 'none'; ansBox.querySelector('.editable-target').innerText = '정답 및 해설'; } newItem.querySelector('.ans-btn').innerText = '💡 정답 및 해설'; } else { newItem.querySelector('.script-text').innerText = '내용'; newItem.id = `script-${Date.now()}`; } item.after(newItem); newItem.querySelector('.item-control-panel').remove(); injectControls(newItem); }
     function toggleAnswer(event, btn) { event.stopPropagation(); const card = btn.closest('.jokbo-card'); const box = card.querySelector('.answer-box'); if (box.style.display === 'block') { box.style.display = 'none'; btn.innerHTML = '💡 정답 및 해설'; } else { box.style.display = 'block'; btn.innerHTML = '접기'; } }
     function toggleAnalysis(event, btn) { event.stopPropagation(); const card = btn.closest('.jokbo-card'); const box = card.querySelector('.analysis-box'); if (box.style.display === 'block') { box.style.display = 'none'; btn.innerHTML = '🤖 AI 출제분석'; } else { box.style.display = 'block'; btn.innerHTML = '분석 닫기'; } }
-    function handleClickSync(el) { if (isEditing) return; const targetPage = el.getAttribute('data-page'); if (!targetPage) return; const targetIdx = parseInt(targetPage) - 13; if (targetIdx >= 0 && targetIdx < pages.length) { document.getElementById(pages[currentPageIdx]).classList.remove('active'); currentPageIdx = targetIdx; const newPageId = pages[currentPageIdx]; document.getElementById(newPageId).classList.add('active'); document.getElementById('headerPageNum').innerText = `Page ${targetPage} / 60`; document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0); document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1); syncRightPanel(targetPage); const canvas = document.getElementById(newPageId).querySelector('canvas'); if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; } el.classList.add('active-context-bg'); setTimeout(() => el.classList.remove('active-context-bg'), 500); } }
-    function showTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const targetTab = document.getElementById(tabId); targetTab.classList.add('active'); targetTab.style.display = 'flex'; document.querySelectorAll('.tab').forEach(el => el.classList.remove('active')); const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId); if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active'); const player = document.getElementById('audioPlayer'); if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none'; const pageNum = pages[currentPageIdx].replace('p', ''); setTimeout(() => syncRightPanel(pageNum), 50); }
-    function toggleJokboList() { isJokboExpanded = !isJokboExpanded; const btn = document.getElementById('jokboExpandBtn'); btn.innerText = isJokboExpanded ? "🔼 현재 문제만 보기" : "🔽 전체 족보 보기"; const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); }
-    function changePage(direction) { if (direction !== 0) { const nextIdx = currentPageIdx + direction; if (nextIdx < 0 || nextIdx >= pages.length) return; document.getElementById(pages[currentPageIdx]).classList.remove('active'); currentPageIdx = nextIdx; } const newPageId = pages[currentPageIdx]; document.getElementById(newPageId).classList.add('active'); const pageNum = newPageId.replace('p', ''); document.getElementById('headerPageNum').innerText = `Page ${pageNum} / 60`; document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0); document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1); syncRightPanel(pageNum); const canvas = document.getElementById(newPageId).querySelector('canvas'); if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; } }
-    function syncRightPanel(pageNum) { document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => { el.classList.remove('active-sync'); el.classList.remove('active-context-bg'); }); const targets = document.querySelectorAll(`[data-page="${pageNum}"]`); targets.forEach(el => { if(el.classList.contains('jokbo-card')) { const isMatch = true; if (isMatch) el.classList.add('active-sync'); if (isJokboExpanded) { el.style.display = 'block'; if (document.getElementById('tab-jokbo').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else { el.style.display = 'block'; } } if(el.classList.contains('script-segment')) { el.classList.add('active-sync'); if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } if(el.classList.contains('msg-group')) { el.querySelector('.ai-msg').classList.add('active-context-bg'); if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }); if (!isJokboExpanded) { document.querySelectorAll('.jokbo-card').forEach(card => { if (card.getAttribute('data-page') !== pageNum) card.style.display = 'none'; }); } }
+    function generateSummary() { const pageNum = pages[currentPageIdx].replace('p', ''); const existing = document.getElementById(`ai-sum-${pageNum}`); if(existing) { existing.style.display = existing.style.display === 'none' ? 'block' : 'none'; return; } const data = aiData[pageNum]; if(!data) return alert("데이터 없음"); const loading = document.getElementById('aiLoading'); loading.style.display = 'block'; loading.scrollIntoView({ behavior: 'smooth' }); setTimeout(() => { loading.style.display = 'none'; const list = document.getElementById('jokboList'); const newCard = document.createElement('div'); newCard.className = 'jokbo-card active-sync'; newCard.id = `ai-sum-${pageNum}`; newCard.setAttribute('data-page', pageNum); newCard.setAttribute('draggable', 'true'); newCard.setAttribute('ondragstart', "drag(event, 'jokbo')"); newCard.onclick = function() { handleClickSync(this); }; newCard.style.display = 'block'; newCard.style.border = '2px solid #66bb6a'; newCard.style.background = '#f1f8e9'; newCard.innerHTML = `<div class="badge-row"><span class="badge ai-new">🤖 AI 핵심 요약</span></div><div class="card-close-btn" onclick="this.parentElement.style.display='none'; event.stopPropagation();">×</div><div class="q-body editable-target" style="white-space: pre-line;">${data.summary}</div><div class="jokbo-footer" style="color:#2e7d32; font-size:11px;">* 자동 생성됨</div>`; list.insertBefore(newCard, loading); newCard.scrollIntoView({ behavior: 'smooth' }); }, 1000); }
+    function generateTwinProblem() { const pageNum = pages[currentPageIdx].replace('p', ''); const existing = document.getElementById(`ai-twin-${pageNum}`); if(existing) { existing.style.display = existing.style.display === 'none' ? 'block' : 'none'; return; } const data = aiData[pageNum]; if(!data) return alert("데이터 없음"); const loading = document.getElementById('aiLoading'); loading.style.display = 'block'; loading.scrollIntoView({ behavior: 'smooth' }); setTimeout(() => { loading.style.display = 'none'; const list = document.getElementById('jokboList'); const newCard = document.createElement('div'); newCard.className = 'jokbo-card active-sync'; newCard.id = `ai-twin-${pageNum}`; newCard.setAttribute('data-page', pageNum); newCard.setAttribute('draggable', 'true'); newCard.setAttribute('ondragstart', "drag(event, 'jokbo')"); newCard.onclick = function() { handleClickSync(this); }; newCard.style.display = 'block'; newCard.innerHTML = `<div class="badge-row"><span class="badge ai-new">🔄 AI 쌍둥이 문제</span></div><div class="card-close-btn" onclick="this.parentElement.style.display='none'; event.stopPropagation();">×</div><div class="q-body editable-target">${data.twin.q}</div><div class="q-options editable-target">${data.twin.a}</div><div class="jokbo-footer"><button class="card-btn ans-btn" onclick="toggleAnswer(event, this)">💡 정답 및 해설</button></div><div class="hidden-box answer-box"><div class="editable-target">${data.twin.ans}</div></div>`; list.insertBefore(newCard, loading); newCard.scrollIntoView({ behavior: 'smooth' }); }, 1000); }
     function initCanvases() { document.querySelectorAll('.drawing-canvas').forEach(canvas => { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; const context = canvas.getContext('2d'); context.lineCap = 'round'; context.lineJoin = 'round'; canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing); }); }
     function setTool(tool) { currentTool = tool; document.querySelectorAll('.pen-btn').forEach(b => b.classList.remove('active')); const icons = {'cursor': '👆', 'pen': '✏️', 'highlighter': '🖍️', 'eraser': '🧹'}; const btns = Array.from(document.querySelectorAll('.pen-btn')); const targetBtn = btns.find(b => b.innerText.includes(icons[tool])); if(targetBtn) targetBtn.classList.add('active'); const pdfContainer = document.getElementById('pdfContainer'); if (tool === 'cursor') pdfContainer.classList.remove('pen-mode'); else pdfContainer.classList.add('pen-mode'); }
     function setColor(color) { currentColor = color; document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active')); const dots = Array.from(document.querySelectorAll('.color-dot')); const targetDot = dots.find(d => d.style.background.includes(color.replace('#',''))); if(targetDot || (color==='black' && dots[0])) (targetDot || dots[0]).classList.add('active'); }
@@ -503,6 +528,10 @@
     function draw(e) { if (!isDrawing) return; const rect = e.target.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; ctx.lineTo(x, y); ctx.stroke(); [lastX, lastY] = [x, y]; }
     function stopDrawing() { isDrawing = false; if(ctx) ctx.closePath(); }
     function clearCanvas() { const activePage = document.querySelector('.pdf-page.active'); const canvas = activePage.querySelector('canvas'); const context = canvas.getContext('2d'); context.clearRect(0, 0, canvas.width, canvas.height); }
+    function showTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const targetTab = document.getElementById(tabId); targetTab.classList.add('active'); targetTab.style.display = 'flex'; document.querySelectorAll('.tab').forEach(el => el.classList.remove('active')); const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId); if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active'); const player = document.getElementById('audioPlayer'); if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none'; const pageNum = pages[currentPageIdx].replace('p', ''); setTimeout(() => syncRightPanel(pageNum), 50); }
+    function toggleJokboList() { isJokboExpanded = !isJokboExpanded; const btn = document.getElementById('jokboExpandBtn'); btn.innerText = isJokboExpanded ? "🔼 현재 문제만 보기" : "🔽 전체 족보 보기"; const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); }
+    function changePage(direction) { if (direction !== 0) { const nextIdx = currentPageIdx + direction; if (nextIdx < 0 || nextIdx >= pages.length) return; document.getElementById(pages[currentPageIdx]).classList.remove('active'); currentPageIdx = nextIdx; } const newPageId = pages[currentPageIdx]; document.getElementById(newPageId).classList.add('active'); const pageNum = newPageId.replace('p', ''); document.getElementById('headerPageNum').innerText = `Page ${pageNum} / 60`; document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0); document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1); syncRightPanel(pageNum); const canvas = document.getElementById(newPageId).querySelector('canvas'); if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; } }
+    function syncRightPanel(pageNum) { document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => { el.classList.remove('active-sync'); el.classList.remove('active-context-bg'); }); const targets = document.querySelectorAll(`[data-page="${pageNum}"]`); targets.forEach(el => { if(el.classList.contains('jokbo-card')) { const isMatch = true; if (isMatch) el.classList.add('active-sync'); if (isJokboExpanded) { el.style.display = 'block'; if (document.getElementById('tab-jokbo').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else { el.style.display = 'block'; } } if(el.classList.contains('script-segment')) { el.classList.add('active-sync'); if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } if(el.classList.contains('msg-group')) { el.classList.add('active-sync'); if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }); if (!isJokboExpanded) { document.querySelectorAll('.jokbo-card').forEach(card => { if (card.getAttribute('data-page') !== pageNum) card.style.display = 'none'; }); } }
     function focusChat(pageNum) { showTab('tab-chat'); changePage(0); changePage(pageNum - 13); }
 </script>
 </body>
