@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v21.0 (Focused Jokbo)</title>
+    <title>Med-Study OS v25.0 (Note Management)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -25,7 +25,7 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
-        /* PDF 내용 스타일 */
+        /* PDF 스타일 */
         .slide-header { border-bottom: 2px solid #003c8f; padding-bottom: 10px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
         .slide-title { font-size: 24px; font-weight: 800; color: #003c8f; }
         .slide-sub { font-size: 14px; color: #666; font-weight: 600; }
@@ -51,10 +51,30 @@
         .nav-prev { left: 20px; } .nav-next { right: 20px; }
         .nav-btn.disabled { opacity: 0; pointer-events: none; }
 
-        /* 포스트잇 */
-        .dropped-note { position: absolute; width: 220px; background-color: #fff9c4; border-left: 4px solid #fbc02d; padding: 10px; font-size: 12px; color: #333; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); border-radius: 0 6px 6px 0; cursor: pointer; z-index: 50; line-height: 1.4; outline: none; }
-        .dropped-note:hover { transform: scale(1.05); z-index: 60; }
+        /* [포스트잇 스타일] */
+        .dropped-note { 
+            position: absolute; width: 220px; background-color: #fff9c4; border-left: 4px solid #fbc02d; 
+            padding: 10px; font-size: 12px; color: #333; box-shadow: 2px 4px 10px rgba(0,0,0,0.2); 
+            border-radius: 0 6px 6px 0; cursor: pointer; z-index: 50; line-height: 1.4; outline: none; 
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        .dropped-note:hover { z-index: 60; }
         .dropped-note.jokbo-note { background-color: #ffebee; border-left: 4px solid #ef5350; }
+        .dropped-note.summary-note { background-color: #e8f5e9; border-left: 4px solid #43a047; } 
+        
+        /* 뷰어 모드일 때 링크 표시 */
+        .viewer-mode .dropped-note:hover { transform: scale(1.05); }
+        .viewer-mode .dropped-note::after { content: "🔗"; position: absolute; bottom: 5px; right: 5px; font-size: 10px; opacity: 0.5; }
+
+        /* 편집 모드일 때 이동/삭제 UI */
+        .editing-mode .dropped-note { cursor: move; border: 1px dashed #333; }
+        .editing-mode .dropped-note:hover { box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
+        .note-delete-btn {
+            display: none; position: absolute; top: -8px; right: -8px; width: 20px; height: 20px;
+            background: #f44336; color: white; border-radius: 50%; text-align: center; line-height: 18px;
+            font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .editing-mode .dropped-note .note-delete-btn { display: block; }
 
         /* --- [오른쪽: 패널] --- */
         .right-panel { flex: 0.8; display: flex; flex-direction: column; background: #f7f8fa; border-left: 1px solid #ddd; position: relative; }
@@ -68,8 +88,8 @@
 
         /* 1. 채팅 스타일 */
         .chat-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 16px; }
-        .msg-group { display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
-        .msg-group:hover { background-color: rgba(33, 150, 243, 0.05); } 
+        .msg-group { display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 8px; cursor: pointer; transition: all 0.3s; opacity: 0.5; filter: grayscale(80%); }
+        .msg-group:hover, .msg-group.active-sync { opacity: 1; filter: grayscale(0%); }
         .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
         .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
         .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
@@ -80,31 +100,36 @@
         .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
         .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
 
-        /* 2. 족보 스타일 (접기/펼치기) */
+        /* 2. 족보 스타일 */
         .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .jokbo-card { 
-            background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 5px; outline: none; cursor: grab;
-            display: none; /* 기본 숨김 (JS로 제어) */
-        }
-        .jokbo-card:hover { border-color: #2196f3; }
-        /* 활성화된 카드는 파란 테두리 */
-        .jokbo-card.active-sync { border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.1); background: #f4faff; }
-        
+        .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 5px; outline: none; cursor: grab; display: none; }
+        .jokbo-card.active-sync { display: block; border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.1); background: #f4faff; animation: slideInRight 0.3s; }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .badge { display: inline-block; padding: 3px 8px; font-size: 11px; border-radius: 4px; font-weight: 700; margin-right: 6px; outline: none; }
         .badge.year { background: #e3f2fd; color: #1565c0; } .badge.freq { background: #ffebee; color: #c62828; }
+        .badge.ai-new { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
         .q-body { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 12px; line-height: 1.5; outline: none; }
         .q-options div { cursor: pointer; padding: 4px 8px; border-radius: 4px; outline: none; }
-        .jokbo-footer { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee; display: flex; justify-content: flex-end; }
-        .analyze-btn { background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; padding: 5px 10px; border-radius: 15px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .analysis-box { display: none; margin-top: 12px; background: #fafafa; border: 1px solid #eee; border-left: 3px solid #7b1fa2; padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.6; color: #444; animation: slideDown 0.3s ease-out; }
+        .jokbo-footer { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee; display: flex; gap: 8px; flex-wrap: wrap; }
+        .card-btn { padding: 6px 12px; border-radius: 15px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 4px; }
+        .ans-btn { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; } .ans-btn:hover { background: #ffe0b2; }
+        .analyze-btn { background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; } .analyze-btn:hover { background: #e1bee7; }
+        .hidden-box { display: none; margin-top: 12px; padding: 12px; border-radius: 6px; font-size: 13px; line-height: 1.6; animation: slideDown 0.3s ease-out; }
+        .answer-box { background: #fff8e1; border: 1px solid #ffecb3; color: #5d4037; }
+        .analysis-box { background: #fafafa; border: 1px solid #eee; border-left: 3px solid #7b1fa2; color: #444; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* 족보 펼치기 버튼 */
-        .jokbo-expand-btn {
-            padding: 12px; text-align: center; background: white; border: 1px solid #ddd; border-radius: 8px; 
-            font-size: 13px; font-weight: bold; color: #555; cursor: pointer; margin-top: 10px;
-            transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .jokbo-expand-btn:hover { background: #f5f5f5; color: #222; }
+        .jokbo-action-bar { margin-top: auto; border-top: 1px solid #eee; padding: 15px; background: white; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .action-row { display: flex; gap: 8px; }
+        .ai-action-btn { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: white; font-size: 12px; font-weight: 700; color: #444; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
+        .ai-action-btn:hover { background: #f5f5f5; border-color: #bbb; transform: translateY(-2px); }
+        .ai-action-btn.primary { background: #e3f2fd; color: #1565c0; border-color: #bbdefb; }
+        .ai-action-btn.secondary { background: #f3e5f5; color: #7b1fa2; border-color: #e1bee7; }
+        .jokbo-expand-btn { width: 100%; padding: 8px; text-align: center; font-size: 11px; color: #888; cursor: pointer; border: 1px solid transparent; border-radius: 4px; }
+        .jokbo-expand-btn:hover { background: #f5f5f5; }
+        .loading-indicator { display: none; text-align: center; padding: 20px; color: #2196f3; font-size: 12px; font-weight: bold; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(33, 150, 243, 0.3); border-radius: 50%; border-top-color: #2196f3; animation: spin 1s ease-in-out infinite; margin-bottom: 5px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         /* 3. 스크립트 스타일 */
         .script-list-area { flex: 1; overflow-y: auto; padding-bottom: 80px; }
@@ -117,6 +142,8 @@
 
         /* 싱크 하이라이트 */
         .active-context-bg { background-color: #fff9c4 !important; transition: background-color 1s; }
+        @keyframes flashHighlight { 0% { background-color: rgba(33, 150, 243, 0.3); } 100% { background-color: transparent; } }
+        .deep-link-highlight { animation: flashHighlight 1.5s ease-out; }
 
         /* 편집 모드 */
         .edit-toolbar { position: fixed; bottom: 30px; right: 30px; display: flex; gap: 10px; z-index: 9999; }
@@ -140,7 +167,7 @@
 </div>
 
 <div class="tablet-frame" id="appRoot">
-    <div class="left-panel">
+    <div class="left-panel viewer-mode" id="pdfPanel">
         <div class="pdf-header">
             <span class="editable-target">📚 [Internal Med] Endocrinology_Ch04_Diabetes.pdf</span>
             <span id="headerPageNum">Page 13 / 60</span>
@@ -169,7 +196,10 @@
                 <canvas class="drawing-canvas"></canvas>
                 <div class="slide-header"><div class="slide-title editable-target">Diabetic Ketoacidosis (DKA)</div><div class="slide-sub editable-target">Endocrinology Part.4</div></div>
                 <div class="content-block"><div class="section-title editable-target">1. Definition & Epidemiology</div><p class="text-body editable-target">인슐린의 절대적 결핍과 대항 호르몬의 증가로 발생하는 급성 대사 합병증.</p></div>
-                <div class="dropped-note editable-target" style="top:400px; left:450px;" ondblclick="deleteNote(this)" onclick="focusChat(13)">📌 AI: 병태생리 핵심</div>
+                <div class="dropped-note editable-target" id="note-demo-1" style="top:400px; left:450px;" onclick="handleNoteClick('chat-13-1')">
+                    <span class="note-delete-btn" onclick="deleteNote(this, event)">×</span>
+                    📌 AI: 병태생리 핵심
+                </div>
             </div>
             <div class="pdf-page" id="p14" ondrop="drop(event)" ondragover="allowDrop(event)">
                 <canvas class="drawing-canvas"></canvas>
@@ -196,7 +226,7 @@
         <div class="tab-content-container">
             <div id="tab-chat" class="tab-content active" style="padding:0;">
                 <div class="chat-scroll-area" id="chatList" style="padding:20px;">
-                    <div class="msg-group" data-page="13" onclick="handleClickSync(this)">
+                    <div class="msg-group" id="chat-13-1" data-page="13" onclick="handleClickSync(this)">
                         <div class="msg-meta editable-target">Page 13 • 병태생리</div>
                         <div class="bubble user-msg editable-target">DKA의 핵심 기전이 뭐야?</div>
                         <div class="bubble ai-msg editable-target">
@@ -204,7 +234,7 @@
                             <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="전체 드래그">📌</div>
                         </div>
                     </div>
-                    <div class="msg-group" data-page="14" onclick="handleClickSync(this)">
+                    <div class="msg-group" id="chat-14-1" data-page="14" onclick="handleClickSync(this)">
                         <div class="msg-meta editable-target">Page 14 • 임상증상</div>
                         <div class="bubble user-msg editable-target">감염 없이 백혈구 증가 가능?</div>
                         <div class="bubble ai-msg editable-target">
@@ -220,43 +250,62 @@
             </div>
 
             <div id="tab-jokbo" class="tab-content">
-                <div class="jokbo-list-area" id="jokboList" style="padding:20px;">
-                    <div class="jokbo-card" data-page="13" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
+                <div class="jokbo-list-area" id="jokboList" style="padding:20px 20px 0 20px; overflow-y:scroll;">
+                    <div class="jokbo-card" id="jokbo-13-1" data-page="13" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
                         <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
                         <div class="q-options editable-target">① Glucagon ② Cortisol ③ Insulin (정답)</div>
-                        <div class="jokbo-footer"><button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button></div>
-                        <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> 길항 호르몬 암기 필수.</div></div>
+                        <div class="jokbo-footer">
+                            <button class="card-btn ans-btn" onclick="toggleAnswer(event, this)">💡 정답 및 해설</button>
+                            <button class="card-btn analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
+                        </div>
+                        <div class="hidden-box answer-box"><div class="editable-target"><strong>[정답] ③ Insulin</strong><br>DKA는 인슐린의 결핍이 원인입니다.</div></div>
+                        <div class="hidden-box analysis-box"><div class="editable-target"><strong>[포인트]</strong> 길항 호르몬 암기 필수.</div></div>
                     </div>
-                    <div class="jokbo-card" data-page="14" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
+                    <div class="jokbo-card" id="jokbo-14-1" data-page="14" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">22년</span></div>
                         <div class="q-body editable-target">Q. 복통, 과일 냄새, 깊은 호흡 환자의 진단은?</div>
                         <div class="q-options editable-target">① 췌장염 ② DKA (정답)</div>
-                        <div class="jokbo-footer"><button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button></div>
-                        <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> DKA의 복통과 Kussmaul 호흡 연계.</div></div>
+                        <div class="jokbo-footer">
+                            <button class="card-btn ans-btn" onclick="toggleAnswer(event, this)">💡 정답 및 해설</button>
+                            <button class="card-btn analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
+                        </div>
+                        <div class="hidden-box answer-box"><div class="editable-target"><strong>[정답] ② DKA</strong><br>Kussmaul 호흡과 아세톤 냄새가 특징입니다.</div></div>
+                        <div class="hidden-box analysis-box"><div class="editable-target"><strong>[포인트]</strong> DKA의 복통과 Kussmaul 호흡 연계.</div></div>
                     </div>
-                    <div class="jokbo-card" data-page="15" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
+                    <div class="jokbo-card" id="jokbo-15-1" data-page="15" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">24년</span></div>
                         <div class="q-body editable-target">Q. K+ 2.8인 DKA 환자의 우선 처치는?</div>
                         <div class="q-options editable-target">① 인슐린 ② KCl 투여 (정답)</div>
-                        <div class="jokbo-footer"><button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button></div>
-                        <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> 인슐린 투여 전 K 보충 원칙.</div></div>
+                        <div class="jokbo-footer">
+                            <button class="card-btn ans-btn" onclick="toggleAnswer(event, this)">💡 정답 및 해설</button>
+                            <button class="card-btn analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
+                        </div>
+                        <div class="hidden-box answer-box"><div class="editable-target"><strong>[정답] ② KCl 투여</strong><br>저칼륨혈증에서 인슐린 투여는 금기입니다.</div></div>
+                        <div class="hidden-box analysis-box"><div class="editable-target"><strong>[포인트]</strong> 인슐린 투여 전 K 보충 원칙.</div></div>
                     </div>
+                    <div class="loading-indicator" id="aiLoading"><div class="spinner"></div><br>AI 생성 중...</div>
                 </div>
-                <div class="jokbo-expand-btn" id="jokboExpandBtn" onclick="toggleJokboList()">🔽 전체 문제 보기</div>
+                <div class="jokbo-action-bar">
+                    <div class="action-row">
+                        <div class="ai-action-btn primary" onclick="generateSummary()">📝 핵심 요약 생성</div>
+                        <div class="ai-action-btn secondary" onclick="generateTwinProblem()">🔄 쌍둥이 문제 생성</div>
+                    </div>
+                    <div class="jokbo-expand-btn" id="jokboExpandBtn" onclick="toggleJokboList()">🔽 전체 족보 보기</div>
+                </div>
             </div>
 
             <div id="tab-script" class="tab-content" style="padding:0;">
                 <div class="script-list-area" id="scriptList" style="padding:20px;">
-                    <div class="script-segment" data-page="13" onclick="handleClickSync(this)">
+                    <div class="script-segment" id="script-13-1" data-page="13" onclick="handleClickSync(this)">
                         <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:30</span></div>
                         <div class="script-text editable-target">자, DKA는 인슐린이 없어서 몸이 산성으로 변하는 응급 질환입니다.</div>
                     </div>
-                    <div class="script-segment" data-page="14" onclick="handleClickSync(this)">
+                    <div class="script-segment" id="script-14-1" data-page="14" onclick="handleClickSync(this)">
                         <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">09:45</span></div>
                         <div class="script-text editable-target">쿠스마울 호흡 잘 보세요. 그리고 배 아프다고 맹장염으로 오진하면 안 됩니다.</div>
                     </div>
-                    <div class="script-segment" data-page="15" onclick="handleClickSync(this)">
+                    <div class="script-segment" id="script-15-1" data-page="15" onclick="handleClickSync(this)">
                         <div class="script-header"><span class="speaker-name editable-target">교수님</span><span class="editable-target">10:05</span></div>
                         <div class="script-text editable-target">치료 순서 족보입니다. 수액 먼저, 칼륨 확인하고 인슐린입니다.</div>
                     </div>
@@ -276,166 +325,103 @@
     let currentPageIdx = 0;
     let isEditing = false;
     let dragSrcEl = null;
+    let isJokboExpanded = false;
     let currentTool = 'cursor';
     let currentColor = 'black';
     let isDrawing = false;
-    let ctx = null;
-    let lastX = 0; let lastY = 0;
-    
-    // [족보 보기 모드 상태]
-    let isJokboExpanded = false;
+    let ctx = null; let lastX = 0; let lastY = 0;
 
-    window.onload = function() {
-        if(localStorage.getItem('medStudyData_v21')) {
-            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v21');
-        }
-        changePage(0);
-        showTab('tab-chat');
-        initCanvases();
+    const aiData = {
+        '13': { summary: "• 인슐린 결핍 + 길항 호르몬(Glucagon 등) 증가\n• 지방분해 가속 → 케톤체 생성 → 대사성 산증", twin: { q: "Q. (변형) DKA 병태생리에서 유리지방산 산화를 촉진하는 장기는?", a: "① 간  ② 근육  ③ 지방", ans: "<strong>[정답] ① 간</strong><br>지방조직에서 분해된 지방산이 '간'으로 이동해 케톤체로 바뀝니다." } },
+        '14': { summary: "• 쿠스마울 호흡: 산증 보상 (CO2 배출)\n• 복통: 급성 복증과 감별 필요", twin: { q: "Q. (변형) 호흡수 35회, 깊은 호흡을 보이는 복통 환자. 우선 시행할 검사는?", a: "① 복부 CT  ② 혈당/케톤  ③ 내시경", ans: "<strong>[정답] ② 혈당/케톤</strong><br>DKA 가능성이 높으므로 혈당과 케톤을 먼저 확인해야 합니다." } },
+        '15': { summary: "• 수액 공급 최우선 (Hydration)\n• 인슐린 전 K+ 확인 필수", twin: { q: "Q. (변형) K+ 3.0, 혈당 450. 인슐린 펌프 전 처치는?", a: "① K+ 보충  ② Bicarb  ③ 인슐린", ans: "<strong>[정답] ① K+ 보충</strong><br>저칼륨혈증 상태에서 인슐린 투여는 금기입니다." } }
     };
 
-    document.addEventListener('input', function() {
-        if(isEditing) localStorage.setItem('medStudyData_v21', document.getElementById('appRoot').innerHTML);
-    });
+    window.onload = function() {
+        if(localStorage.getItem('medStudyData_v25')) { document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v25'); }
+        changePage(0); showTab('tab-chat'); initCanvases();
+    };
+    document.addEventListener('input', function() { if(isEditing) localStorage.setItem('medStudyData_v25', document.getElementById('appRoot').innerHTML); });
+    function resetData() { if(confirm("초기화하시겠습니까?")) { localStorage.removeItem('medStudyData_v25'); location.reload(); } }
 
-    function resetData() {
-        if(confirm("초기화하시겠습니까?")) {
-            localStorage.removeItem('medStudyData_v21');
-            location.reload();
-        }
+    /* [노트 관리 핵심 함수] */
+    // 클릭 이벤트: 편집모드 아닐 때만 이동
+    function handleNoteClick(sourceId) {
+        if (isEditing) return; // 편집중이면 이동 X
+        jumpToSource(sourceId);
     }
 
-    // [족보 뷰 토글]
-    function toggleJokboList() {
-        isJokboExpanded = !isJokboExpanded;
-        const btn = document.getElementById('jokboExpandBtn');
-        btn.innerText = isJokboExpanded ? "🔼 현재 문제만 보기" : "🔽 전체 문제 보기";
-        // 화면 갱신
-        const pageNum = pages[currentPageIdx].replace('p', '');
-        syncRightPanel(pageNum);
-    }
+    // 딥링크 이동 로직
+    function jumpToSource(sourceId) {
+        if (!sourceId) return;
+        if (sourceId.includes('chat')) showTab('tab-chat');
+        else if (sourceId.includes('jokbo')) showTab('tab-jokbo');
+        else if (sourceId.includes('script')) showTab('tab-script');
 
-    // [싱크 & 표시 로직 수정]
-    function syncRightPanel(pageNum) {
-        // 기존 하이라이트 제거
-        document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => {
-            el.classList.remove('active-sync'); el.classList.remove('active-context-bg');
-        });
-
-        // 1. 족보 처리
-        const jokboCards = document.querySelectorAll('.jokbo-card');
-        let hasMatch = false;
-        
-        jokboCards.forEach(card => {
-            const isMatch = card.getAttribute('data-page') === pageNum;
-            if (isMatch) {
-                card.classList.add('active-sync');
-                hasMatch = true;
-            }
-
-            if (isJokboExpanded) {
-                // 전체 보기 모드: 다 보여줌
-                card.style.display = 'block';
-                // 매칭된 것만 스크롤
-                if (isMatch && document.getElementById('tab-jokbo').classList.contains('active')) {
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+            const el = document.getElementById(sourceId);
+            if(el) {
+                // 족보가 숨겨져 있을 경우 처리
+                if(el.style.display === 'none') {
+                    // 현재 페이지가 해당 족보 페이지가 아니면 이동
+                    const page = el.getAttribute('data-page');
+                    if (page) {
+                        const targetIdx = parseInt(page) - 13;
+                        if (targetIdx !== currentPageIdx) changePage(targetIdx - currentPageIdx);
+                    }
                 }
-            } else {
-                // 현재 문제만 보기 모드: 매칭된 것만 show
-                if (isMatch) card.style.display = 'block';
-                else card.style.display = 'none';
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // 하이라이트
+                if(el.classList.contains('msg-group')) {
+                    el.querySelector('.ai-msg').classList.add('deep-link-highlight');
+                    setTimeout(() => el.querySelector('.ai-msg').classList.remove('deep-link-highlight'), 1500);
+                } else {
+                    el.classList.add('deep-link-highlight');
+                    setTimeout(() => el.classList.remove('deep-link-highlight'), 1500);
+                }
             }
-        });
-        
-        // 매칭된 문제가 없으면 안내 메시지 (선택 사항)
-        // if (!hasMatch && !isJokboExpanded) { ... }
-
-        // 2. 스크립트 & 채팅 (기존과 동일하게 스크롤)
-        document.querySelectorAll('.script-segment').forEach(el => {
-            if(el.getAttribute('data-page') === pageNum) {
-                el.classList.add('active-sync');
-                if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        });
-        document.querySelectorAll('.msg-group').forEach(el => {
-            if(el.getAttribute('data-page') === pageNum) {
-                el.querySelector('.ai-msg').classList.add('active-context-bg');
-                if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        });
+        }, 150);
     }
 
-    // [이하 기존 기능 유지]
-    function initCanvases() {
-        document.querySelectorAll('.drawing-canvas').forEach(canvas => {
-            canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
-            const context = canvas.getContext('2d'); context.lineCap = 'round'; context.lineJoin = 'round';
-            canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing);
-        });
-    }
-    function setTool(tool) {
-        currentTool = tool;
-        document.querySelectorAll('.pen-btn').forEach(b => b.classList.remove('active'));
-        const icons = {'cursor': '👆', 'pen': '✏️', 'highlighter': '🖍️', 'eraser': '🧹'};
-        const btns = Array.from(document.querySelectorAll('.pen-btn'));
-        const targetBtn = btns.find(b => b.innerText.includes(icons[tool]));
-        if(targetBtn) targetBtn.classList.add('active');
-        const pdfContainer = document.getElementById('pdfContainer');
-        if (tool === 'cursor') pdfContainer.classList.remove('pen-mode'); else pdfContainer.classList.add('pen-mode');
-    }
-    function setColor(color) {
-        currentColor = color;
-        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-        const dots = Array.from(document.querySelectorAll('.color-dot'));
-        const targetDot = dots.find(d => d.style.background.includes(color.replace('#','')));
-        if(targetDot || (color==='black' && dots[0])) (targetDot || dots[0]).classList.add('active');
-    }
-    function startDrawing(e) {
-        if (currentTool === 'cursor') return;
-        isDrawing = true;
-        const canvas = e.target; ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect(); lastX = e.clientX - rect.left; lastY = e.clientY - rect.top;
-        ctx.beginPath(); ctx.moveTo(lastX, lastY);
-        if (currentTool === 'pen') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentColor; ctx.lineWidth = 2; }
-        else if (currentTool === 'highlighter') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentColor === '#d32f2f' ? 'rgba(255, 235, 59, 0.4)' : 'rgba(0, 255, 0, 0.3)'; ctx.lineWidth = 15; }
-        else if (currentTool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 20; }
-    }
-    function draw(e) { if (!isDrawing) return; const rect = e.target.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; ctx.lineTo(x, y); ctx.stroke(); [lastX, lastY] = [x, y]; }
-    function stopDrawing() { isDrawing = false; if(ctx) ctx.closePath(); }
-    function clearCanvas() { const activePage = document.querySelector('.pdf-page.active'); const canvas = activePage.querySelector('canvas'); const context = canvas.getContext('2d'); context.clearRect(0, 0, canvas.width, canvas.height); }
-
-    function showTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
-        const targetTab = document.getElementById(tabId); targetTab.classList.add('active'); targetTab.style.display = 'flex';
-        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-        const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId);
-        if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active');
-        const player = document.getElementById('audioPlayer');
-        if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none';
-        const pageNum = pages[currentPageIdx].replace('p', '');
-        setTimeout(() => syncRightPanel(pageNum), 50);
+    // 노트 삭제
+    function deleteNote(btn, event) {
+        event.stopPropagation(); // 부모 클릭 방지
+        if(confirm("이 메모를 삭제하시겠습니까?")) btn.parentElement.remove();
     }
 
-    function toggleAnalysis(event, btn) {
-        event.stopPropagation();
-        const box = btn.closest('.jokbo-card').querySelector('.analysis-box');
-        if (box.style.display === 'block') { box.style.display = 'none'; btn.innerHTML = '🤖 AI 출제분석'; }
-        else { box.style.display = 'block'; btn.innerHTML = '🔼 분석 닫기'; }
-    }
-
+    // [편집 모드 토글]
     function toggleEditMode() {
         isEditing = !isEditing;
         const btn = document.getElementById('editToggleBtn');
         const body = document.body;
+        const pdfPanel = document.getElementById('pdfPanel');
+        
         if(isEditing) {
             btn.classList.add('active'); btn.innerHTML = '💾'; body.classList.add('editing-mode');
+            pdfPanel.classList.remove('viewer-mode'); // 뷰어 모드 해제
+            
+            // 노트 드래그 가능하게 설정
+            document.querySelectorAll('.dropped-note').forEach(note => {
+                note.setAttribute('draggable', 'true');
+                note.setAttribute('ondragstart', 'dragNote(event)');
+            });
+
+            // 우측 패널 정렬 드래그 활성화
             const targets = document.querySelectorAll('.msg-group, .jokbo-card, .script-segment');
             targets.forEach(el => injectControls(el));
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "true");
         } else {
             btn.classList.remove('active'); btn.innerHTML = '✎'; body.classList.remove('editing-mode');
+            pdfPanel.classList.add('viewer-mode'); // 뷰어 모드 활성 (호버 효과 등)
+
             document.querySelectorAll('.item-control-panel').forEach(el => el.remove());
+            
+            // 드래그 속성 정리
+            document.querySelectorAll('.dropped-note').forEach(note => {
+                note.removeAttribute('draggable');
+                note.removeAttribute('ondragstart');
+            });
             document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => {
                 el.removeAttribute('draggable');
                 el.removeEventListener('dragstart', handleSortStart);
@@ -446,85 +432,34 @@
                     el.setAttribute('ondragstart', "drag(event, 'jokbo')");
                 }
             });
+
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false");
-            localStorage.setItem('medStudyData_v21', document.getElementById('appRoot').innerHTML);
+            localStorage.setItem('medStudyData_v25', document.getElementById('appRoot').innerHTML);
             const pageNum = pages[currentPageIdx].replace('p', '');
             syncRightPanel(pageNum);
         }
     }
 
-    function injectControls(el) {
-        if(el.querySelector('.item-control-panel')) return;
-        const page = el.getAttribute('data-page') || '0';
-        const panel = document.createElement('div');
-        panel.className = 'item-control-panel';
-        panel.contentEditable = "false";
-        panel.innerHTML = `
-            <span class="drag-handle" onmousedown="enableSortDrag(this)">⠿</span>
-            <span>Page:</span> <input type="text" class="page-input" value="${page}" onchange="updatePage(this)">
-            <button class="ctrl-btn add" onclick="addItem(this)">+</button>
-            <button class="ctrl-btn del" onclick="deleteItem(this)">🗑️</button>
-        `;
-        el.insertBefore(panel, el.firstChild);
+    /* [드래그 앤 드롭 로직 통합] */
+    // 1. 노트 이동 드래그 시작
+    function dragNote(ev) {
+        ev.dataTransfer.setData("type", "move_note");
+        ev.dataTransfer.setData("noteId", ev.target.id); // ID 기반 이동
+        // 오프셋 계산 (마우스가 노트 내 어디를 잡았는지)
+        const rect = ev.target.getBoundingClientRect();
+        ev.dataTransfer.setData("offsetX", ev.clientX - rect.left);
+        ev.dataTransfer.setData("offsetY", ev.clientY - rect.top);
     }
 
-    function handleClickSync(el) {
-        if (isEditing) return;
-        const targetPage = el.getAttribute('data-page');
-        if (!targetPage) return;
-        const targetIdx = parseInt(targetPage) - 13;
-        if (targetIdx >= 0 && targetIdx < pages.length) {
-            document.getElementById(pages[currentPageIdx]).classList.remove('active');
-            currentPageIdx = targetIdx;
-            const newPageId = pages[currentPageIdx];
-            document.getElementById(newPageId).classList.add('active');
-            document.getElementById('headerPageNum').innerText = `Page ${targetPage} / 60`;
-            document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0);
-            document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1);
-            syncRightPanel(targetPage);
-            
-            const canvas = document.getElementById(newPageId).querySelector('canvas');
-            if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; }
-            el.classList.add('active-context-bg');
-            setTimeout(() => el.classList.remove('active-context-bg'), 500);
-        }
-    }
-
-    function enableSortDrag(handle) {
-        const item = handle.closest('.msg-group, .jokbo-card, .script-segment');
-        item.setAttribute('draggable', 'true');
-        item.addEventListener('dragstart', handleSortStart);
-        item.addEventListener('dragover', handleSortOver);
-        item.addEventListener('drop', handleSortDrop);
-        item.addEventListener('dragend', handleSortEnd);
-    }
-    function handleSortStart(e) { dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('sort-type', 'true'); this.classList.add('sortable-ghost'); }
-    function handleSortOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
-    function handleSortDrop(e) {
-        e.stopPropagation();
-        if (!e.dataTransfer.getData('sort-type')) return false;
-        if (dragSrcEl !== this) {
-            const rect = this.getBoundingClientRect();
-            if(e.clientY < rect.top + (rect.height / 2)) this.parentNode.insertBefore(dragSrcEl, this);
-            else this.parentNode.insertBefore(dragSrcEl, this.nextSibling);
-        }
-        return false;
-    }
-    function handleSortEnd(e) {
-        this.classList.remove('sortable-ghost');
-        this.removeAttribute('draggable');
-        this.removeEventListener('dragstart', handleSortStart);
-        this.removeEventListener('dragover', handleSortOver);
-        this.removeEventListener('drop', handleSortDrop);
-        if(this.classList.contains('jokbo-card')) {
-             this.setAttribute('draggable', 'true');
-             this.setAttribute('ondragstart', "drag(event, 'jokbo')");
-        }
-    }
-
+    // 2. 외부(우측패널)에서 드래그 시작
     function drag(ev, type) { 
         const selection = window.getSelection().toString();
-        if (selection && selection.length > 0) { ev.dataTransfer.setData("type", 'text'); return; }
+        if (selection && selection.length > 0) { ev.dataTransfer.setData("type", 'text'); } // 텍스트 선택 우선
+        
+        // 소스 ID 저장 (딥링크용)
+        const container = ev.target.closest('[id]');
+        if (container) ev.dataTransfer.setData("sourceId", container.id);
+
         if (type === 'ai') {
             const bubble = ev.target.closest('.ai-msg');
             const text = bubble.innerText.replace("📌", "").trim();
@@ -532,70 +467,118 @@
             ev.dataTransfer.setData("type", 'ai_bubble');
             return;
         }
-        if(type === 'jokbo') { ev.dataTransfer.setData("text", ev.target.innerText); ev.dataTransfer.setData("type", 'jokbo'); }
+        if(type === 'jokbo') { 
+            ev.dataTransfer.setData("text", ev.target.innerText); 
+            ev.dataTransfer.setData("type", 'jokbo'); 
+        }
     }
+    
     function allowDrop(ev) { ev.preventDefault(); }
+    
+    // 3. 드롭 처리 (통합)
     function drop(ev) {
         ev.preventDefault();
-        if (ev.dataTransfer.getData('sort-type')) return;
+        if (ev.dataTransfer.getData('sort-type')) return; // 정렬 드래그 무시
+
+        // A. 노트 이동인 경우
+        const moveType = ev.dataTransfer.getData("type");
+        if (moveType === 'move_note') {
+            const noteId = ev.dataTransfer.getData("noteId");
+            const note = document.getElementById(noteId);
+            if (!note) return; // 없는 경우 (혹시나)
+
+            const offsetX = parseFloat(ev.dataTransfer.getData("offsetX"));
+            const offsetY = parseFloat(ev.dataTransfer.getData("offsetY"));
+            const pageRect = ev.currentTarget.getBoundingClientRect();
+
+            note.style.left = (ev.clientX - pageRect.left - offsetX) + 'px';
+            note.style.top = (ev.clientY - pageRect.top - offsetY) + 'px';
+            return; // 이동 처리 완료
+        }
+
+        // B. 새로운 노트 생성인 경우
         const rect = ev.currentTarget.getBoundingClientRect();
         const note = document.createElement("div");
         note.className = "dropped-note editable-target";
-        note.setAttribute("ondblclick", "deleteNote(this)");
+        note.id = `note-${Date.now()}`; // 고유 ID 부여
         
-        const type = ev.dataTransfer.getData("type");
-        const textData = ev.dataTransfer.getData("text") || ev.dataTransfer.getData("text/plain");
+        const sourceId = ev.dataTransfer.getData("sourceId");
+        if (sourceId) {
+            // 클릭 이벤트 바인딩 (HTML 문자열이 아닌 JS 함수로 연결해야 안전)
+            note.onclick = function() { handleNoteClick(sourceId); };
+            note.title = "클릭하여 원문 이동";
+        }
+        
+        // 삭제 버튼 추가
+        const delBtn = document.createElement("span");
+        delBtn.className = "note-delete-btn";
+        delBtn.innerText = "×";
+        delBtn.onclick = function(e) { deleteNote(this, e); };
+        note.appendChild(delBtn);
 
+        // 내용 채우기
+        const textData = ev.dataTransfer.getData("text") || ev.dataTransfer.getData("text/plain");
+        const type = ev.dataTransfer.getData("type");
+
+        let contentHtml = "";
         if (type === 'jokbo') {
             note.classList.add('jokbo-note');
-            const qLine = textData.split('\n').find(l => l.includes('Q.')) || textData;
-            note.innerHTML = `📌 <strong>족보 연결</strong><br>${qLine.substring(0, 35)}...`;
+            const cleanText = textData.replace('🤖 AI 핵심 요약', '').replace('🔄 AI 쌍둥이 문제', '').trim();
+            const qLine = cleanText.split('\n').find(l => l.includes('Q.') || l.includes('•')) || cleanText;
+            if(textData.includes('핵심 요약')) {
+                note.classList.add('summary-note');
+                contentHtml = `📌 <strong>AI 요약</strong><br>${qLine.substring(0, 35)}...`;
+            } else {
+                contentHtml = `📌 <strong>족보 연결</strong><br>${qLine.substring(0, 35)}...`;
+            }
         } else if (type === 'ai_bubble') {
-            note.innerHTML = `📌 <strong>AI 메모 (전체)</strong><br>${textData.substring(0, 30)}...`;
+            contentHtml = `📌 <strong>AI 메모 (전체)</strong><br>${textData.substring(0, 30)}...`;
         } else {
             if (!textData) return;
-            note.innerHTML = `📌 <strong>AI 메모 (발췌)</strong><br>${textData.substring(0, 30)}...`;
+            contentHtml = `📌 <strong>AI 메모 (발췌)</strong><br>${textData.substring(0, 30)}...`;
         }
+        
+        // 기존 span(삭제버튼) 유지하면서 내용 추가
+        note.innerHTML += contentHtml;
+
         note.style.left = (ev.clientX - rect.left) + "px"; 
         note.style.top = (ev.clientY - rect.top) + "px";
-        if(isEditing) note.contentEditable = "true";
+        
+        // 편집모드라면 드래그 가능하게 바로 설정
+        if(isEditing) {
+            note.contentEditable = "true";
+            note.setAttribute('draggable', 'true');
+            note.setAttribute('ondragstart', 'dragNote(event)');
+        }
+        
         ev.currentTarget.appendChild(note);
     }
 
+    // [이하 기존 기능 유지]
+    function injectControls(el) { if(el.querySelector('.item-control-panel')) return; const page = el.getAttribute('data-page') || '0'; const panel = document.createElement('div'); panel.className = 'item-control-panel'; panel.contentEditable = "false"; panel.innerHTML = `<span class="drag-handle" onmousedown="enableSortDrag(this)">⠿</span><span>Page:</span> <input type="text" class="page-input" value="${page}" onchange="updatePage(this)"><button class="ctrl-btn add" onclick="addItem(this)">+</button><button class="ctrl-btn del" onclick="deleteItem(this)">🗑️</button>`; el.insertBefore(panel, el.firstChild); }
+    function enableSortDrag(handle) { const item = handle.closest('.msg-group, .jokbo-card, .script-segment'); item.setAttribute('draggable', 'true'); item.addEventListener('dragstart', handleSortStart); item.addEventListener('dragover', handleSortOver); item.addEventListener('drop', handleSortDrop); item.addEventListener('dragend', handleSortEnd); }
+    function handleSortStart(e) { dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('sort-type', 'true'); this.classList.add('sortable-ghost'); }
+    function handleSortOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+    function handleSortDrop(e) { e.stopPropagation(); if (!e.dataTransfer.getData('sort-type')) return false; if (dragSrcEl !== this) { const rect = this.getBoundingClientRect(); if(e.clientY < rect.top + (rect.height / 2)) this.parentNode.insertBefore(dragSrcEl, this); else this.parentNode.insertBefore(dragSrcEl, this.nextSibling); } return false; }
+    function handleSortEnd(e) { this.classList.remove('sortable-ghost'); this.removeAttribute('draggable'); this.removeEventListener('dragstart', handleSortStart); this.removeEventListener('dragover', handleSortOver); this.removeEventListener('drop', handleSortDrop); if(this.classList.contains('jokbo-card')) { this.setAttribute('draggable', 'true'); this.setAttribute('ondragstart', "drag(event, 'jokbo')"); } }
     function updatePage(input) { input.closest('.msg-group, .jokbo-card, .script-segment').setAttribute('data-page', input.value); }
     function deleteItem(btn) { if(confirm('삭제?')) btn.closest('.msg-group, .jokbo-card, .script-segment').remove(); }
-    function deleteNote(el) { if(isEditing && confirm("삭제?")) el.remove(); }
-
-    function addItem(btn) {
-        const item = btn.closest('.msg-group, .jokbo-card, .script-segment');
-        const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script';
-        let newItem = item.cloneNode(true);
-        if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; const aiMsg = newItem.querySelector('.ai-msg'); aiMsg.childNodes[0].nodeValue = "답변"; }
-        else if(type === 'jokbo') { newItem.querySelector('.q-body').innerText = '문제'; const box = newItem.querySelector('.analysis-box'); if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; } newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석'; }
-        else { newItem.querySelector('.script-text').innerText = '내용'; }
-        item.after(newItem);
-        newItem.querySelector('.item-control-panel').remove();
-        injectControls(newItem);
-    }
-
-    function changePage(direction) {
-        if (direction !== 0) {
-            const nextIdx = currentPageIdx + direction;
-            if (nextIdx < 0 || nextIdx >= pages.length) return;
-            document.getElementById(pages[currentPageIdx]).classList.remove('active');
-            currentPageIdx = nextIdx;
-        }
-        const newPageId = pages[currentPageIdx];
-        document.getElementById(newPageId).classList.add('active');
-        const pageNum = newPageId.replace('p', '');
-        document.getElementById('headerPageNum').innerText = `Page ${pageNum} / 60`;
-        document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0);
-        document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1);
-        syncRightPanel(pageNum);
-        const canvas = document.getElementById(newPageId).querySelector('canvas');
-        if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; }
-    }
-
+    function addItem(btn) { const item = btn.closest('.msg-group, .jokbo-card, .script-segment'); const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script'; let newItem = item.cloneNode(true); if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; newItem.id = `chat-${Date.now()}`; const aiMsg = newItem.querySelector('.ai-msg'); aiMsg.childNodes[0].nodeValue = "답변"; } else if(type === 'jokbo') { newItem.querySelector('.q-body').innerText = '문제'; newItem.id = `jokbo-${Date.now()}`; const box = newItem.querySelector('.analysis-box'); if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; } newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석'; const ansBox = newItem.querySelector('.answer-box'); if(ansBox) { ansBox.style.display = 'none'; ansBox.querySelector('.editable-target').innerText = '정답 및 해설'; } newItem.querySelector('.ans-btn').innerText = '💡 정답 및 해설'; } else { newItem.querySelector('.script-text').innerText = '내용'; newItem.id = `script-${Date.now()}`; } item.after(newItem); newItem.querySelector('.item-control-panel').remove(); injectControls(newItem); }
+    function toggleAnswer(event, btn) { event.stopPropagation(); const card = btn.closest('.jokbo-card'); const box = card.querySelector('.answer-box'); if (box.style.display === 'block') { box.style.display = 'none'; btn.innerHTML = '💡 정답 및 해설'; } else { box.style.display = 'block'; btn.innerHTML = '접기'; } }
+    function toggleAnalysis(event, btn) { event.stopPropagation(); const card = btn.closest('.jokbo-card'); const box = card.querySelector('.analysis-box'); if (box.style.display === 'block') { box.style.display = 'none'; btn.innerHTML = '🤖 AI 출제분석'; } else { box.style.display = 'block'; btn.innerHTML = '분석 닫기'; } }
+    function generateSummary() { const pageNum = pages[currentPageIdx].replace('p', ''); const data = aiData[pageNum]; if(!data) return alert("데이터 없음"); const loading = document.getElementById('aiLoading'); loading.style.display = 'block'; loading.scrollIntoView({ behavior: 'smooth' }); setTimeout(() => { loading.style.display = 'none'; const list = document.getElementById('jokboList'); const newCard = document.createElement('div'); newCard.className = 'jokbo-card active-sync'; newCard.id = `ai-sum-${Date.now()}`; newCard.setAttribute('data-page', pageNum); newCard.setAttribute('draggable', 'true'); newCard.setAttribute('ondragstart', "drag(event, 'jokbo')"); newCard.onclick = function() { handleClickSync(this); }; newCard.style.display = 'block'; newCard.style.border = '2px solid #66bb6a'; newCard.style.background = '#f1f8e9'; newCard.innerHTML = `<div class="badge-row"><span class="badge ai-new">🤖 AI 핵심 요약</span></div><div class="q-body editable-target" style="white-space: pre-line;">${data.summary}</div><div class="jokbo-footer" style="color:#2e7d32; font-size:11px;">* 자동 생성됨</div>`; list.insertBefore(newCard, loading); newCard.scrollIntoView({ behavior: 'smooth' }); }, 1000); }
+    function generateTwinProblem() { const pageNum = pages[currentPageIdx].replace('p', ''); const data = aiData[pageNum]; if(!data) return alert("데이터 없음"); const loading = document.getElementById('aiLoading'); loading.style.display = 'block'; loading.scrollIntoView({ behavior: 'smooth' }); setTimeout(() => { loading.style.display = 'none'; const list = document.getElementById('jokboList'); const newCard = document.createElement('div'); newCard.className = 'jokbo-card active-sync'; newCard.id = `ai-twin-${Date.now()}`; newCard.setAttribute('data-page', pageNum); newCard.setAttribute('draggable', 'true'); newCard.setAttribute('ondragstart', "drag(event, 'jokbo')"); newCard.onclick = function() { handleClickSync(this); }; newCard.style.display = 'block'; newCard.innerHTML = `<div class="badge-row"><span class="badge ai-new">🔄 AI 쌍둥이 문제</span></div><div class="q-body editable-target">${data.twin.q}</div><div class="q-options editable-target">${data.twin.a}</div><div class="jokbo-footer"><button class="card-btn ans-btn" onclick="toggleAnswer(event, this)">💡 정답 및 해설</button></div><div class="hidden-box answer-box"><div class="editable-target">${data.twin.ans}</div></div>`; list.insertBefore(newCard, loading); newCard.scrollIntoView({ behavior: 'smooth' }); }, 1000); }
+    function initCanvases() { document.querySelectorAll('.drawing-canvas').forEach(canvas => { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; const context = canvas.getContext('2d'); context.lineCap = 'round'; context.lineJoin = 'round'; canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing); }); }
+    function setTool(tool) { currentTool = tool; document.querySelectorAll('.pen-btn').forEach(b => b.classList.remove('active')); const icons = {'cursor': '👆', 'pen': '✏️', 'highlighter': '🖍️', 'eraser': '🧹'}; const btns = Array.from(document.querySelectorAll('.pen-btn')); const targetBtn = btns.find(b => b.innerText.includes(icons[tool])); if(targetBtn) targetBtn.classList.add('active'); const pdfContainer = document.getElementById('pdfContainer'); if (tool === 'cursor') pdfContainer.classList.remove('pen-mode'); else pdfContainer.classList.add('pen-mode'); }
+    function setColor(color) { currentColor = color; document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active')); const dots = Array.from(document.querySelectorAll('.color-dot')); const targetDot = dots.find(d => d.style.background.includes(color.replace('#',''))); if(targetDot || (color==='black' && dots[0])) (targetDot || dots[0]).classList.add('active'); }
+    function startDrawing(e) { if (currentTool === 'cursor') return; isDrawing = true; const canvas = e.target; ctx = canvas.getContext('2d'); const rect = canvas.getBoundingClientRect(); lastX = e.clientX - rect.left; lastY = e.clientY - rect.top; ctx.beginPath(); ctx.moveTo(lastX, lastY); if (currentTool === 'pen') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentColor; ctx.lineWidth = 2; } else if (currentTool === 'highlighter') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentColor === '#d32f2f' ? 'rgba(255, 235, 59, 0.4)' : 'rgba(0, 255, 0, 0.3)'; ctx.lineWidth = 15; } else if (currentTool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 20; } }
+    function draw(e) { if (!isDrawing) return; const rect = e.target.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; ctx.lineTo(x, y); ctx.stroke(); [lastX, lastY] = [x, y]; }
+    function stopDrawing() { isDrawing = false; if(ctx) ctx.closePath(); }
+    function clearCanvas() { const activePage = document.querySelector('.pdf-page.active'); const canvas = activePage.querySelector('canvas'); const context = canvas.getContext('2d'); context.clearRect(0, 0, canvas.width, canvas.height); }
+    function showTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; }); const targetTab = document.getElementById(tabId); targetTab.classList.add('active'); targetTab.style.display = 'flex'; document.querySelectorAll('.tab').forEach(el => el.classList.remove('active')); const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId); if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active'); const player = document.getElementById('audioPlayer'); if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none'; const pageNum = pages[currentPageIdx].replace('p', ''); setTimeout(() => syncRightPanel(pageNum), 50); }
+    function toggleJokboList() { isJokboExpanded = !isJokboExpanded; const btn = document.getElementById('jokboExpandBtn'); btn.innerText = isJokboExpanded ? "🔼 현재 문제만 보기" : "🔽 전체 족보 보기"; const pageNum = pages[currentPageIdx].replace('p', ''); syncRightPanel(pageNum); }
+    function changePage(direction) { if (direction !== 0) { const nextIdx = currentPageIdx + direction; if (nextIdx < 0 || nextIdx >= pages.length) return; document.getElementById(pages[currentPageIdx]).classList.remove('active'); currentPageIdx = nextIdx; } const newPageId = pages[currentPageIdx]; document.getElementById(newPageId).classList.add('active'); const pageNum = newPageId.replace('p', ''); document.getElementById('headerPageNum').innerText = `Page ${pageNum} / 60`; document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0); document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1); syncRightPanel(pageNum); const canvas = document.getElementById(newPageId).querySelector('canvas'); if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; } }
+    function syncRightPanel(pageNum) { document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => { el.classList.remove('active-sync'); el.classList.remove('active-context-bg'); }); const targets = document.querySelectorAll(`[data-page="${pageNum}"]`); targets.forEach(el => { if(el.classList.contains('jokbo-card')) { const isMatch = true; if (isMatch) el.classList.add('active-sync'); if (isJokboExpanded) { el.style.display = 'block'; if (document.getElementById('tab-jokbo').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } else { el.style.display = 'block'; } } if(el.classList.contains('script-segment')) { el.classList.add('active-sync'); if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } if(el.classList.contains('msg-group')) { el.querySelector('.ai-msg').classList.add('active-context-bg'); if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }); if (!isJokboExpanded) { document.querySelectorAll('.jokbo-card').forEach(card => { if (card.getAttribute('data-page') !== pageNum) card.style.display = 'none'; }); } }
     function focusChat(pageNum) { showTab('tab-chat'); changePage(0); changePage(pageNum - 13); }
 </script>
 </body>
