@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v17.0 (AI Analysis)</title>
+    <title>Med-Study OS v18.0 (Perfect Drag)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -54,19 +54,31 @@
         .tab-content { display: none !important; padding: 20px; padding-bottom: 100px; flex: 1; flex-direction: column; }
         .tab-content.active { display: flex !important; }
 
-        /* 1. 채팅 스타일 */
+        /* 1. 채팅 스타일 (드래그 핸들 추가) */
         .chat-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 16px; }
         .msg-group { display: flex; flex-direction: column; gap: 6px; transition: transform 0.2s, background-color 0.2s; padding: 5px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
         .msg-group:hover { background-color: rgba(33, 150, 243, 0.05); } 
         .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
-        .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
+        .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; position: relative; }
         .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
-        .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: text; user-select: text; }
+        
+        /* AI 말풍선: 텍스트 선택 가능 */
+        .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: text; user-select: text; padding-right: 30px; /* 아이콘 공간 */ }
+        
+        /* 드래그 핸들 (말풍선 안의 핀 아이콘) */
+        .bubble-drag-handle {
+            position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; 
+            display: flex; justify-content: center; align-items: center; 
+            cursor: grab; opacity: 0.3; transition: 0.2s; font-size: 14px;
+        }
+        .ai-msg:hover .bubble-drag-handle { opacity: 1; }
+        .bubble-drag-handle:active { cursor: grabbing; }
+
         .chat-input-area { height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
         .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
 
-        /* 2. 족보 스타일 (분석 기능 추가) */
+        /* 2. 족보 스타일 */
         .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; }
         .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; outline: none; transition: transform 0.2s, opacity 0.3s; cursor: grab; opacity: 0.8; }
         .jokbo-card:hover { opacity: 1; border-color: #bbb; }
@@ -75,21 +87,9 @@
         .badge.year { background: #e3f2fd; color: #1565c0; } .badge.freq { background: #ffebee; color: #c62828; }
         .q-body { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 12px; line-height: 1.5; outline: none; }
         .q-options div { cursor: pointer; padding: 4px 8px; border-radius: 4px; outline: none; }
-        
-        /* 🤖 분석 버튼 및 박스 */
         .jokbo-footer { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee; display: flex; justify-content: flex-end; }
-        .analyze-btn {
-            background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7;
-            padding: 5px 10px; border-radius: 15px; font-size: 11px; font-weight: 700;
-            cursor: pointer; display: flex; align-items: center; gap: 4px; transition: 0.2s;
-        }
-        .analyze-btn:hover { background: #e1bee7; transform: scale(1.05); }
-        .analysis-box {
-            display: none; margin-top: 12px; background: #fafafa; 
-            border: 1px solid #eee; border-left: 3px solid #7b1fa2;
-            padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.6; color: #444;
-            animation: slideDown 0.3s ease-out;
-        }
+        .analyze-btn { background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; padding: 5px 10px; border-radius: 15px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .analysis-box { display: none; margin-top: 12px; background: #fafafa; border: 1px solid #eee; border-left: 3px solid #7b1fa2; padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.6; color: #444; animation: slideDown 0.3s ease-out; }
         .analysis-box strong { color: #7b1fa2; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -176,12 +176,18 @@
                     <div class="msg-group" data-page="13" onclick="handleClickSync(this)">
                         <div class="msg-meta editable-target">Page 13 • 병태생리</div>
                         <div class="bubble user-msg editable-target">DKA의 핵심 기전이 뭐야?</div>
-                        <div class="bubble ai-msg editable-target">인슐린 결핍으로 지방이 분해되어 케톤체가 생성됩니다.</div>
+                        <div class="bubble ai-msg editable-target">
+                            인슐린 결핍으로 지방이 분해되어 케톤체가 생성됩니다.
+                            <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="이 답변 전체 드래그">📌</div>
+                        </div>
                     </div>
                     <div class="msg-group" data-page="14" onclick="handleClickSync(this)">
                         <div class="msg-meta editable-target">Page 14 • 임상증상</div>
                         <div class="bubble user-msg editable-target">감염 없이 백혈구 증가 가능?</div>
-                        <div class="bubble ai-msg editable-target">네, 스트레스 호르몬 증가로 반응성 상승이 가능합니다.</div>
+                        <div class="bubble ai-msg editable-target">
+                            네, 스트레스 호르몬 증가로 반응성 상승이 가능합니다.
+                            <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="이 답변 전체 드래그">📌</div>
+                        </div>
                     </div>
                 </div>
                 <div class="chat-input-area">
@@ -192,52 +198,27 @@
 
             <div id="tab-jokbo" class="tab-content">
                 <div class="jokbo-list-area" id="jokboList">
-                    
                     <div class="jokbo-card" data-page="13" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
                         <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
                         <div class="q-options editable-target">① Glucagon ② Cortisol ③ Insulin (정답)</div>
-                        <div class="jokbo-footer">
-                            <button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
-                        </div>
-                        <div class="analysis-box">
-                            <div class="editable-target">
-                                <strong>[강의록 연계]</strong> P.13 'Pathophysiology'의 2번째 줄 "대항 호르몬의 증가" 내용과 직결됩니다.<br>
-                                <strong>[출제 포인트]</strong> 인슐린 결핍과 반대로 작용하는 호르몬(길항 호르몬)들의 목록을 정확히 암기해야 합니다.
-                            </div>
-                        </div>
+                        <div class="jokbo-footer"><button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button></div>
+                        <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> 길항 호르몬 암기 필수.</div></div>
                     </div>
-
                     <div class="jokbo-card" data-page="14" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">22년</span></div>
                         <div class="q-body editable-target">Q. 복통, 과일 냄새, 깊은 호흡 환자의 진단은?</div>
                         <div class="q-options editable-target">① 췌장염 ② DKA (정답)</div>
-                        <div class="jokbo-footer">
-                            <button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
-                        </div>
-                        <div class="analysis-box">
-                            <div class="editable-target">
-                                <strong>[강의록 연계]</strong> P.14 'Symptoms'의 복통(Abdominal Pain) 및 'Kussmaul Respiration' 기술.<br>
-                                <strong>[출제 포인트]</strong> DKA의 복통 증상은 급성 췌장염이나 위장관 질환(Acute Abdomen)으로 오진하기 쉬워 감별 진단이 중요합니다.
-                            </div>
-                        </div>
+                        <div class="jokbo-footer"><button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button></div>
+                        <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> DKA의 복통과 Kussmaul 호흡 연계.</div></div>
                     </div>
-
                     <div class="jokbo-card" data-page="15" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">24년</span></div>
                         <div class="q-body editable-target">Q. K+ 2.8인 DKA 환자의 우선 처치는?</div>
                         <div class="q-options editable-target">① 인슐린 ② KCl 투여 (정답)</div>
-                        <div class="jokbo-footer">
-                            <button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
-                        </div>
-                        <div class="analysis-box">
-                            <div class="editable-target">
-                                <strong>[강의록 연계]</strong> P.15 'Management' 섹션의 ⚠️ 경고 박스 내용.<br>
-                                <strong>[출제 포인트]</strong> "인슐린은 칼륨을 낮춘다"는 기전을 이해하고, 심정지 예방을 위해 K 보충이 선행되어야 함을 묻는 문제입니다.
-                            </div>
-                        </div>
+                        <div class="jokbo-footer"><button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button></div>
+                        <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> 인슐린 투여 전 K 보충 원칙.</div></div>
                     </div>
-
                 </div>
             </div>
 
@@ -273,36 +254,21 @@
     let dragSrcEl = null;
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v17')) {
-            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v17');
+        if(localStorage.getItem('medStudyData_v18')) {
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v18');
         }
         changePage(0);
         showTab('tab-chat');
     };
 
     document.addEventListener('input', function() {
-        if(isEditing) localStorage.setItem('medStudyData_v17', document.getElementById('appRoot').innerHTML);
+        if(isEditing) localStorage.setItem('medStudyData_v18', document.getElementById('appRoot').innerHTML);
     });
 
     function resetData() {
         if(confirm("초기화하시겠습니까?")) {
-            localStorage.removeItem('medStudyData_v17');
+            localStorage.removeItem('medStudyData_v18');
             location.reload();
-        }
-    }
-
-    // [분석창 토글]
-    function toggleAnalysis(event, btn) {
-        event.stopPropagation(); // 카드 클릭 싱크 방지
-        const card = btn.closest('.jokbo-card');
-        const box = card.querySelector('.analysis-box');
-        
-        if (box.style.display === 'block') {
-            box.style.display = 'none';
-            btn.innerHTML = '🤖 AI 출제분석';
-        } else {
-            box.style.display = 'block';
-            btn.innerHTML = '🔼 분석 닫기';
         }
     }
 
@@ -322,6 +288,13 @@
 
         const pageNum = pages[currentPageIdx].replace('p', '');
         setTimeout(() => syncRightPanel(pageNum), 50);
+    }
+
+    function toggleAnalysis(event, btn) {
+        event.stopPropagation();
+        const box = btn.closest('.jokbo-card').querySelector('.analysis-box');
+        if (box.style.display === 'block') { box.style.display = 'none'; btn.innerHTML = '🤖 AI 출제분석'; }
+        else { box.style.display = 'block'; btn.innerHTML = '🔼 분석 닫기'; }
     }
 
     // [편집 모드]
@@ -351,7 +324,7 @@
             });
 
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false");
-            localStorage.setItem('medStudyData_v17', document.getElementById('appRoot').innerHTML);
+            localStorage.setItem('medStudyData_v18', document.getElementById('appRoot').innerHTML);
             const pageNum = pages[currentPageIdx].replace('p', '');
             syncRightPanel(pageNum);
         }
@@ -425,13 +398,34 @@
         }
     }
 
-    // [일반 드래그]
+    // [드래그 앤 드롭 (핵심 로직)]
     function drag(ev, type) { 
+        // 1. 텍스트 선택 드래그인지 확인 (우선순위 1)
         const selection = window.getSelection().toString();
-        if (selection && selection.length > 0) { ev.dataTransfer.setData("type", type || 'text'); return; }
-        if(type === 'jokbo') { ev.dataTransfer.setData("text", ev.target.innerText); ev.dataTransfer.setData("type", 'jokbo'); }
+        if (selection && selection.length > 0) { 
+            ev.dataTransfer.setData("type", 'text'); 
+            return; 
+        }
+        
+        // 2. 핀 아이콘(핸들) 드래그인지 확인 (우선순위 2)
+        if (type === 'ai') {
+            // 부모 bubble을 찾아서 텍스트 가져오기
+            const bubble = ev.target.closest('.ai-msg');
+            const text = bubble.innerText.replace("📌", "").trim(); // 핀 아이콘 텍스트 제거
+            ev.dataTransfer.setData("text", text); 
+            ev.dataTransfer.setData("type", 'ai_bubble');
+            return;
+        }
+
+        // 3. 족보 카드 드래그
+        if(type === 'jokbo') { 
+            ev.dataTransfer.setData("text", ev.target.innerText); 
+            ev.dataTransfer.setData("type", 'jokbo'); 
+        }
     }
+    
     function allowDrop(ev) { ev.preventDefault(); }
+    
     function drop(ev) {
         ev.preventDefault();
         if (ev.dataTransfer.getData('sort-type')) return;
@@ -441,17 +435,21 @@
         note.setAttribute("ondblclick", "deleteNote(this)");
         
         const type = ev.dataTransfer.getData("type");
+        const textData = ev.dataTransfer.getData("text") || ev.dataTransfer.getData("text/plain");
+
         if (type === 'jokbo') {
-            const text = ev.dataTransfer.getData("text");
             note.classList.add('jokbo-note');
-            const lines = text.split('\n');
-            const qLine = lines.find(l => l.includes('Q.')) || text;
+            const qLine = textData.split('\n').find(l => l.includes('Q.')) || textData;
             note.innerHTML = `📌 <strong>족보 연결</strong><br>${qLine.substring(0, 35)}...`;
+        } else if (type === 'ai_bubble') {
+            // 말풍선 전체 드래그
+            note.innerHTML = `📌 <strong>AI 메모 (전체)</strong><br>${textData.substring(0, 30)}...`;
         } else {
-            const text = ev.dataTransfer.getData("text/plain");
-            if (!text) return;
-            note.innerHTML = `📌 <strong>AI 메모</strong><br>${text.substring(0, 30)}...`;
+            // 텍스트 선택 드래그
+            if (!textData) return;
+            note.innerHTML = `📌 <strong>AI 메모 (발췌)</strong><br>${textData.substring(0, 30)}...`;
         }
+        
         note.style.left = (ev.clientX - rect.left) + "px"; 
         note.style.top = (ev.clientY - rect.top) + "px";
         if(isEditing) note.contentEditable = "true";
@@ -466,10 +464,13 @@
         const item = btn.closest('.msg-group, .jokbo-card, .script-segment');
         const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script';
         let newItem = item.cloneNode(true);
-        if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; newItem.querySelector('.ai-msg').innerText = '답변'; }
+        if(type === 'chat') { 
+            newItem.querySelector('.user-msg').innerText = '질문'; 
+            const aiMsg = newItem.querySelector('.ai-msg');
+            aiMsg.childNodes[0].nodeValue = "답변"; // 텍스트만 변경 (핀 유지)
+        }
         else if(type === 'jokbo') { 
             newItem.querySelector('.q-body').innerText = '문제';
-            // 분석박스 초기화
             const box = newItem.querySelector('.analysis-box');
             if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; }
             newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석';
