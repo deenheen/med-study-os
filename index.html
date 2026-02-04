@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v16.0 (Tab Visibility Fixed)</title>
+    <title>Med-Study OS v17.0 (AI Analysis)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -49,13 +49,9 @@
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 600; color: #888; font-size: 14px; transition: 0.2s; }
         .tab.active { color: #2196f3; border-bottom: 3px solid #2196f3; background: #fff; }
         
-        /* 탭 컨텐츠 영역 */
+        /* 탭 컨텐츠 */
         .tab-content-container { flex: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; display: flex; flex-direction: column; }
-        
-        /* [중요] 탭 컨텐츠 기본적으로 숨김 처리 */
         .tab-content { display: none !important; padding: 20px; padding-bottom: 100px; flex: 1; flex-direction: column; }
-        
-        /* [중요] 활성화된 탭만 보임 */
         .tab-content.active { display: flex !important; }
 
         /* 1. 채팅 스타일 */
@@ -70,7 +66,7 @@
         .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
         .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
 
-        /* 2. 족보 스타일 */
+        /* 2. 족보 스타일 (분석 기능 추가) */
         .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; }
         .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; outline: none; transition: transform 0.2s, opacity 0.3s; cursor: grab; opacity: 0.8; }
         .jokbo-card:hover { opacity: 1; border-color: #bbb; }
@@ -79,6 +75,23 @@
         .badge.year { background: #e3f2fd; color: #1565c0; } .badge.freq { background: #ffebee; color: #c62828; }
         .q-body { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 12px; line-height: 1.5; outline: none; }
         .q-options div { cursor: pointer; padding: 4px 8px; border-radius: 4px; outline: none; }
+        
+        /* 🤖 분석 버튼 및 박스 */
+        .jokbo-footer { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee; display: flex; justify-content: flex-end; }
+        .analyze-btn {
+            background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7;
+            padding: 5px 10px; border-radius: 15px; font-size: 11px; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; gap: 4px; transition: 0.2s;
+        }
+        .analyze-btn:hover { background: #e1bee7; transform: scale(1.05); }
+        .analysis-box {
+            display: none; margin-top: 12px; background: #fafafa; 
+            border: 1px solid #eee; border-left: 3px solid #7b1fa2;
+            padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.6; color: #444;
+            animation: slideDown 0.3s ease-out;
+        }
+        .analysis-box strong { color: #7b1fa2; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* 3. 스크립트 스타일 */
         .script-list-area { flex: 1; overflow-y: auto; padding-bottom: 80px; }
@@ -179,21 +192,52 @@
 
             <div id="tab-jokbo" class="tab-content">
                 <div class="jokbo-list-area" id="jokboList">
+                    
                     <div class="jokbo-card" data-page="13" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
                         <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
                         <div class="q-options editable-target">① Glucagon ② Cortisol ③ Insulin (정답)</div>
+                        <div class="jokbo-footer">
+                            <button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
+                        </div>
+                        <div class="analysis-box">
+                            <div class="editable-target">
+                                <strong>[강의록 연계]</strong> P.13 'Pathophysiology'의 2번째 줄 "대항 호르몬의 증가" 내용과 직결됩니다.<br>
+                                <strong>[출제 포인트]</strong> 인슐린 결핍과 반대로 작용하는 호르몬(길항 호르몬)들의 목록을 정확히 암기해야 합니다.
+                            </div>
+                        </div>
                     </div>
+
                     <div class="jokbo-card" data-page="14" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">22년</span></div>
                         <div class="q-body editable-target">Q. 복통, 과일 냄새, 깊은 호흡 환자의 진단은?</div>
                         <div class="q-options editable-target">① 췌장염 ② DKA (정답)</div>
+                        <div class="jokbo-footer">
+                            <button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
+                        </div>
+                        <div class="analysis-box">
+                            <div class="editable-target">
+                                <strong>[강의록 연계]</strong> P.14 'Symptoms'의 복통(Abdominal Pain) 및 'Kussmaul Respiration' 기술.<br>
+                                <strong>[출제 포인트]</strong> DKA의 복통 증상은 급성 췌장염이나 위장관 질환(Acute Abdomen)으로 오진하기 쉬워 감별 진단이 중요합니다.
+                            </div>
+                        </div>
                     </div>
+
                     <div class="jokbo-card" data-page="15" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">24년</span></div>
                         <div class="q-body editable-target">Q. K+ 2.8인 DKA 환자의 우선 처치는?</div>
                         <div class="q-options editable-target">① 인슐린 ② KCl 투여 (정답)</div>
+                        <div class="jokbo-footer">
+                            <button class="analyze-btn" onclick="toggleAnalysis(event, this)">🤖 AI 출제분석</button>
+                        </div>
+                        <div class="analysis-box">
+                            <div class="editable-target">
+                                <strong>[강의록 연계]</strong> P.15 'Management' 섹션의 ⚠️ 경고 박스 내용.<br>
+                                <strong>[출제 포인트]</strong> "인슐린은 칼륨을 낮춘다"는 기전을 이해하고, 심정지 예방을 위해 K 보충이 선행되어야 함을 묻는 문제입니다.
+                            </div>
+                        </div>
                     </div>
+
                 </div>
             </div>
 
@@ -229,74 +273,72 @@
     let dragSrcEl = null;
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v16')) {
-            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v16');
+        if(localStorage.getItem('medStudyData_v17')) {
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v17');
         }
         changePage(0);
-        showTab('tab-chat'); // 초기 탭 설정
+        showTab('tab-chat');
     };
 
     document.addEventListener('input', function() {
-        if(isEditing) localStorage.setItem('medStudyData_v16', document.getElementById('appRoot').innerHTML);
+        if(isEditing) localStorage.setItem('medStudyData_v17', document.getElementById('appRoot').innerHTML);
     });
 
     function resetData() {
         if(confirm("초기화하시겠습니까?")) {
-            localStorage.removeItem('medStudyData_v16');
+            localStorage.removeItem('medStudyData_v17');
             location.reload();
         }
     }
 
-    // [탭 제어 - 버그 수정 핵심 파트]
-    function showTab(tabId) {
-        // 1. 모든 탭 컨텐츠 숨기기 (JS에서 강제)
-        document.querySelectorAll('.tab-content').forEach(el => {
-            el.classList.remove('active');
-            el.style.display = 'none'; // 강제 숨김
-        });
+    // [분석창 토글]
+    function toggleAnalysis(event, btn) {
+        event.stopPropagation(); // 카드 클릭 싱크 방지
+        const card = btn.closest('.jokbo-card');
+        const box = card.querySelector('.analysis-box');
         
-        // 2. 선택된 탭만 보이기
+        if (box.style.display === 'block') {
+            box.style.display = 'none';
+            btn.innerHTML = '🤖 AI 출제분석';
+        } else {
+            box.style.display = 'block';
+            btn.innerHTML = '🔼 분석 닫기';
+        }
+    }
+
+    // [탭 제어]
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
         const targetTab = document.getElementById(tabId);
         targetTab.classList.add('active');
-        targetTab.style.display = 'flex'; // 강제 보임
+        targetTab.style.display = 'flex';
         
-        // 3. 상단 탭 버튼 스타일 업데이트
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-        // tab-chat: 0, tab-jokbo: 1, tab-script: 2
         const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId);
-        if(document.querySelectorAll('.tab')[tabIndex]) {
-            document.querySelectorAll('.tab')[tabIndex].classList.add('active');
-        }
+        if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active');
         
-        // 4. 오디오 플레이어 제어 (스크립트 탭일 때만 표시)
         const player = document.getElementById('audioPlayer');
         if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none';
 
-        // 5. 싱크 맞추기
         const pageNum = pages[currentPageIdx].replace('p', '');
         setTimeout(() => syncRightPanel(pageNum), 50);
     }
 
-    // [편집 모드 제어]
+    // [편집 모드]
     function toggleEditMode() {
         isEditing = !isEditing;
         const btn = document.getElementById('editToggleBtn');
         const body = document.body;
         
         if(isEditing) {
-            btn.classList.add('active');
-            btn.innerHTML = '💾';
-            body.classList.add('editing-mode');
+            btn.classList.add('active'); btn.innerHTML = '💾'; body.classList.add('editing-mode');
             const targets = document.querySelectorAll('.msg-group, .jokbo-card, .script-segment');
             targets.forEach(el => injectControls(el));
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "true");
         } else {
-            btn.classList.remove('active');
-            btn.innerHTML = '✎';
-            body.classList.remove('editing-mode');
+            btn.classList.remove('active'); btn.innerHTML = '✎'; body.classList.remove('editing-mode');
             document.querySelectorAll('.item-control-panel').forEach(el => el.remove());
             
-            // 드래그 속성 클린업
             document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => {
                 el.removeAttribute('draggable');
                 el.removeEventListener('dragstart', handleSortStart);
@@ -309,7 +351,7 @@
             });
 
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false");
-            localStorage.setItem('medStudyData_v16', document.getElementById('appRoot').innerHTML);
+            localStorage.setItem('medStudyData_v17', document.getElementById('appRoot').innerHTML);
             const pageNum = pages[currentPageIdx].replace('p', '');
             syncRightPanel(pageNum);
         }
@@ -383,7 +425,7 @@
         }
     }
 
-    // [일반 드래그 (Drop to PDF)]
+    // [일반 드래그]
     function drag(ev, type) { 
         const selection = window.getSelection().toString();
         if (selection && selection.length > 0) { ev.dataTransfer.setData("type", type || 'text'); return; }
@@ -425,7 +467,13 @@
         const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script';
         let newItem = item.cloneNode(true);
         if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; newItem.querySelector('.ai-msg').innerText = '답변'; }
-        else if(type === 'jokbo') { newItem.querySelector('.q-body').innerText = '문제'; }
+        else if(type === 'jokbo') { 
+            newItem.querySelector('.q-body').innerText = '문제';
+            // 분석박스 초기화
+            const box = newItem.querySelector('.analysis-box');
+            if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; }
+            newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석';
+        }
         else { newItem.querySelector('.script-text').innerText = '내용'; }
         item.after(newItem);
         newItem.querySelector('.item-control-panel').remove();
