@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Med-Study OS v18.0 (Perfect Drag)</title>
+    <title>Med-Study OS v21.0 (Focused Jokbo)</title>
     <style>
         /* [기본 스타일] */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -19,9 +19,13 @@
         .pdf-viewer-container { flex: 1; position: relative; overflow: hidden; background: #525659; display: flex; justify-content: center; align-items: center; padding: 20px; }
         .pdf-page { width: 100%; height: 100%; max-width: 800px; max-height: 1130px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); padding: 40px 50px; position: absolute; display: none; flex-direction: column; overflow-y: auto; border-radius: 2px; }
         .pdf-page.active { display: flex; animation: fadeIn 0.2s ease-out; }
+        .drawing-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
+        .pen-mode .drawing-canvas { pointer-events: auto; cursor: crosshair; }
+        .pen-mode .text-body, .pen-mode .dropped-note { user-select: none; }
+
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
-        /* PDF 스타일 */
+        /* PDF 내용 스타일 */
         .slide-header { border-bottom: 2px solid #003c8f; padding-bottom: 10px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
         .slide-title { font-size: 24px; font-weight: 800; color: #003c8f; }
         .slide-sub { font-size: 14px; color: #666; font-weight: 600; }
@@ -31,6 +35,15 @@
         .text-body { font-size: 14px; line-height: 1.7; color: #444; text-align: justify; outline: none; }
         .info-box { background: #f5f9ff; border: 1px solid #b3e5fc; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #0277bd; outline: none; }
         .warn-box { background: #fff5f5; border: 1px solid #ffcdd2; padding: 12px; border-radius: 6px; font-size: 13px; margin: 10px 0; color: #c62828; font-weight: 600; outline: none; }
+
+        /* 툴바 */
+        .pen-toolbar { height: 50px; background: #f5f5f5; border-bottom: 1px solid #ddd; display: flex; align-items: center; padding: 0 20px; gap: 15px; }
+        .tool-group { display: flex; gap: 8px; border-right: 1px solid #ccc; padding-right: 15px; }
+        .pen-btn { width: 36px; height: 36px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center; background: white; }
+        .pen-btn:hover { background: #e0e0e0; }
+        .pen-btn.active { background: #d1eaff; border-color: #2196f3; color: #1565c0; }
+        .color-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #ccc; cursor: pointer; }
+        .color-dot.active { transform: scale(1.2); box-shadow: 0 0 0 2px #2196f3; }
 
         /* 네비게이션 버튼 */
         .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 20px; z-index: 100; transition: 0.2s; }
@@ -49,40 +62,34 @@
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 600; color: #888; font-size: 14px; transition: 0.2s; }
         .tab.active { color: #2196f3; border-bottom: 3px solid #2196f3; background: #fff; }
         
-        /* 탭 컨텐츠 */
         .tab-content-container { flex: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; display: flex; flex-direction: column; }
         .tab-content { display: none !important; padding: 20px; padding-bottom: 100px; flex: 1; flex-direction: column; }
         .tab-content.active { display: flex !important; }
 
-        /* 1. 채팅 스타일 (드래그 핸들 추가) */
+        /* 1. 채팅 스타일 */
         .chat-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 16px; }
-        .msg-group { display: flex; flex-direction: column; gap: 6px; transition: transform 0.2s, background-color 0.2s; padding: 5px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+        .msg-group { display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
         .msg-group:hover { background-color: rgba(33, 150, 243, 0.05); } 
         .msg-meta { font-size: 11px; color: #999; margin-left: 4px; display: flex; gap: 6px; }
-        .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; position: relative; }
+        .bubble { max-width: 92%; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; box-shadow: 0 1px 2px rgba(0,0,0,0.05); outline: none; }
         .user-msg { align-self: flex-end; background: #4a90e2; color: white; border-bottom-right-radius: 2px; }
-        
-        /* AI 말풍선: 텍스트 선택 가능 */
-        .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: text; user-select: text; padding-right: 30px; /* 아이콘 공간 */ }
-        
-        /* 드래그 핸들 (말풍선 안의 핀 아이콘) */
-        .bubble-drag-handle {
-            position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; 
-            display: flex; justify-content: center; align-items: center; 
-            cursor: grab; opacity: 0.3; transition: 0.2s; font-size: 14px;
-        }
+        .ai-msg { align-self: flex-start; background: white; color: #333; border: 1px solid #eee; border-bottom-left-radius: 2px; cursor: text; user-select: text; padding-right: 30px; position: relative; }
+        .bubble-drag-handle { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; display: flex; justify-content: center; align-items: center; cursor: grab; opacity: 0.3; transition: 0.2s; font-size: 14px; }
         .ai-msg:hover .bubble-drag-handle { opacity: 1; }
-        .bubble-drag-handle:active { cursor: grabbing; }
-
         .chat-input-area { height: 70px; background: white; border-top: 1px solid #ddd; padding: 10px 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .chat-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 15px; font-size: 14px; outline: none; background: #f9f9f9; }
         .send-btn { width: 40px; height: 40px; background: #2196f3; color: white; border: none; border-radius: 50%; cursor: pointer; }
 
-        /* 2. 족보 스타일 */
-        .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; }
-        .jokbo-card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; outline: none; transition: transform 0.2s, opacity 0.3s; cursor: grab; opacity: 0.8; }
-        .jokbo-card:hover { opacity: 1; border-color: #bbb; }
-        .jokbo-card.active-sync { opacity: 1; border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2); background: #f4faff; transform: scale(1.02); }
+        /* 2. 족보 스타일 (접기/펼치기) */
+        .jokbo-list-area { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .jokbo-card { 
+            background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 5px; outline: none; cursor: grab;
+            display: none; /* 기본 숨김 (JS로 제어) */
+        }
+        .jokbo-card:hover { border-color: #2196f3; }
+        /* 활성화된 카드는 파란 테두리 */
+        .jokbo-card.active-sync { border: 2px solid #2196f3; box-shadow: 0 4px 15px rgba(33, 150, 243, 0.1); background: #f4faff; }
+        
         .badge { display: inline-block; padding: 3px 8px; font-size: 11px; border-radius: 4px; font-weight: 700; margin-right: 6px; outline: none; }
         .badge.year { background: #e3f2fd; color: #1565c0; } .badge.freq { background: #ffebee; color: #c62828; }
         .q-body { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 12px; line-height: 1.5; outline: none; }
@@ -90,40 +97,38 @@
         .jokbo-footer { margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee; display: flex; justify-content: flex-end; }
         .analyze-btn { background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; padding: 5px 10px; border-radius: 15px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; }
         .analysis-box { display: none; margin-top: 12px; background: #fafafa; border: 1px solid #eee; border-left: 3px solid #7b1fa2; padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.6; color: #444; animation: slideDown 0.3s ease-out; }
-        .analysis-box strong { color: #7b1fa2; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* 족보 펼치기 버튼 */
+        .jokbo-expand-btn {
+            padding: 12px; text-align: center; background: white; border: 1px solid #ddd; border-radius: 8px; 
+            font-size: 13px; font-weight: bold; color: #555; cursor: pointer; margin-top: 10px;
+            transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .jokbo-expand-btn:hover { background: #f5f5f5; color: #222; }
 
         /* 3. 스크립트 스타일 */
         .script-list-area { flex: 1; overflow-y: auto; padding-bottom: 80px; }
-        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; transition: transform 0.2s, opacity 0.3s; opacity: 0.8; cursor: text; }
-        .script-segment.active-sync { opacity: 1; border-left: 5px solid #2196f3; background: #fbfdff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .script-segment { background: white; padding: 16px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 12px; transition: transform 0.2s, opacity 0.3s; opacity: 0.4; cursor: text; }
+        .script-segment:hover { opacity: 0.8; }
+        .script-segment.active-sync { opacity: 1; border-left: 5px solid #2196f3; background: #fbfdff; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .script-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: #888; }
         .script-text { font-size: 14px; line-height: 1.6; color: #333; outline: none; }
-
-        /* 오디오 플레이어 */
         .audio-player-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 75px; background: white; border-top: 1px solid #ddd; display: flex; align-items: center; padding: 0 20px; gap: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); display: none; z-index: 200; }
 
         /* 싱크 하이라이트 */
         .active-context-bg { background-color: #fff9c4 !important; transition: background-color 1s; }
 
-        /* ==================== [편집 모드] ==================== */
+        /* 편집 모드 */
         .edit-toolbar { position: fixed; bottom: 30px; right: 30px; display: flex; gap: 10px; z-index: 9999; }
         .tool-btn { width: 50px; height: 50px; border-radius: 25px; border: none; color: white; font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: 0.2s; display: flex; justify-content: center; align-items: center; }
         .btn-edit { background: #2196f3; } .btn-edit.active { background: #e91e63; }
         .btn-reset { background: #607d8b; font-size: 20px; }
-        
         .editing-mode .editable-target:hover { outline: 2px dashed #2196f3; background: rgba(33,150,243,0.05); cursor: text; }
-        
         .item-control-panel { display: none; background: #333; color: white; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px; font-size: 12px; align-items: center; gap: 8px; cursor: default; }
         .editing-mode .item-control-panel { display: flex; }
-        
         .drag-handle { cursor: grab; font-size: 16px; color: #aaa; margin-right: 5px; user-select: none; }
-        .drag-handle:active { cursor: grabbing; color: white; }
-        
         .ctrl-btn { cursor: pointer; background: #555; border: none; color: white; width: 20px; height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
-        .ctrl-btn:hover { background: #777; } .ctrl-btn.add { background: #2196f3; } .ctrl-btn.del { background: #f44336; }
         .page-input { width: 30px; background: #444; border: 1px solid #666; color: white; text-align: center; border-radius: 3px; }
-
         .sortable-ghost { opacity: 0.4; background: #e3f2fd; border: 2px dashed #2196f3; }
     </style>
 </head>
@@ -141,21 +146,39 @@
             <span id="headerPageNum">Page 13 / 60</span>
         </div>
         
-        <div class="pdf-viewer-container">
+        <div class="pen-toolbar">
+            <div class="tool-group">
+                <div class="pen-btn active" onclick="setTool('cursor')" title="선택 모드">👆</div>
+                <div class="pen-btn" onclick="setTool('pen')" title="펜 모드">✏️</div>
+                <div class="pen-btn" onclick="setTool('highlighter')" title="형광펜">🖍️</div>
+                <div class="pen-btn" onclick="setTool('eraser')" title="지우개">🧹</div>
+            </div>
+            <div class="tool-group" id="colorPalette">
+                <div class="color-dot active" style="background:black;" onclick="setColor('black')"></div>
+                <div class="color-dot" style="background:#d32f2f;" onclick="setColor('#d32f2f')"></div>
+                <div class="color-dot" style="background:#1976d2;" onclick="setColor('#1976d2')"></div>
+            </div>
+            <div class="pen-btn" onclick="clearCanvas()" title="전체 삭제" style="margin-left:auto;">🗑️</div>
+        </div>
+
+        <div class="pdf-viewer-container" id="pdfContainer">
             <div class="nav-btn nav-prev disabled" onclick="changePage(-1)">❮</div>
             <div class="nav-btn nav-next" onclick="changePage(1)">❯</div>
 
             <div class="pdf-page active" id="p13" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <canvas class="drawing-canvas"></canvas>
                 <div class="slide-header"><div class="slide-title editable-target">Diabetic Ketoacidosis (DKA)</div><div class="slide-sub editable-target">Endocrinology Part.4</div></div>
                 <div class="content-block"><div class="section-title editable-target">1. Definition & Epidemiology</div><p class="text-body editable-target">인슐린의 절대적 결핍과 대항 호르몬의 증가로 발생하는 급성 대사 합병증.</p></div>
                 <div class="dropped-note editable-target" style="top:400px; left:450px;" ondblclick="deleteNote(this)" onclick="focusChat(13)">📌 AI: 병태생리 핵심</div>
             </div>
             <div class="pdf-page" id="p14" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <canvas class="drawing-canvas"></canvas>
                 <div class="slide-header"><div class="slide-title editable-target">Precipitating Factors</div></div>
                 <div class="content-block"><div class="section-title editable-target">Triggers</div><div class="text-body editable-target"><ul><li>Infection (m/c)</li><li>Insulin Omission</li></ul></div></div>
                 <div class="warn-box editable-target">⚠️ 감염 없어도 백혈구 증가 가능.</div>
             </div>
              <div class="pdf-page" id="p15" ondrop="drop(event)" ondragover="allowDrop(event)">
+                <canvas class="drawing-canvas"></canvas>
                 <div class="slide-header"><div class="slide-title editable-target">Clinical Features</div></div>
                 <div class="content-block"><div class="section-title editable-target">Symptoms</div><p class="text-body editable-target">다뇨, 다음, 구토, 복통.</p></div>
                 <div class="info-box editable-target">★ Kussmaul Respiration: 과일 냄새.</div>
@@ -178,7 +201,7 @@
                         <div class="bubble user-msg editable-target">DKA의 핵심 기전이 뭐야?</div>
                         <div class="bubble ai-msg editable-target">
                             인슐린 결핍으로 지방이 분해되어 케톤체가 생성됩니다.
-                            <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="이 답변 전체 드래그">📌</div>
+                            <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="전체 드래그">📌</div>
                         </div>
                     </div>
                     <div class="msg-group" data-page="14" onclick="handleClickSync(this)">
@@ -186,7 +209,7 @@
                         <div class="bubble user-msg editable-target">감염 없이 백혈구 증가 가능?</div>
                         <div class="bubble ai-msg editable-target">
                             네, 스트레스 호르몬 증가로 반응성 상승이 가능합니다.
-                            <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="이 답변 전체 드래그">📌</div>
+                            <div class="bubble-drag-handle" draggable="true" ondragstart="drag(event, 'ai')" title="전체 드래그">📌</div>
                         </div>
                     </div>
                 </div>
@@ -197,7 +220,7 @@
             </div>
 
             <div id="tab-jokbo" class="tab-content">
-                <div class="jokbo-list-area" id="jokboList">
+                <div class="jokbo-list-area" id="jokboList" style="padding:20px;">
                     <div class="jokbo-card" data-page="13" draggable="true" ondragstart="drag(event, 'jokbo')" onclick="handleClickSync(this)">
                         <div class="badge-row"><span class="badge year editable-target">23년</span><span class="badge freq editable-target">★빈출</span></div>
                         <div class="q-body editable-target">Q. DKA 환자에서 증가하는 호르몬이 아닌 것은?</div>
@@ -220,6 +243,7 @@
                         <div class="analysis-box"><div class="editable-target"><strong>[포인트]</strong> 인슐린 투여 전 K 보충 원칙.</div></div>
                     </div>
                 </div>
+                <div class="jokbo-expand-btn" id="jokboExpandBtn" onclick="toggleJokboList()">🔽 전체 문제 보기</div>
             </div>
 
             <div id="tab-script" class="tab-content" style="padding:0;">
@@ -252,40 +276,143 @@
     let currentPageIdx = 0;
     let isEditing = false;
     let dragSrcEl = null;
+    let currentTool = 'cursor';
+    let currentColor = 'black';
+    let isDrawing = false;
+    let ctx = null;
+    let lastX = 0; let lastY = 0;
+    
+    // [족보 보기 모드 상태]
+    let isJokboExpanded = false;
 
     window.onload = function() {
-        if(localStorage.getItem('medStudyData_v18')) {
-            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v18');
+        if(localStorage.getItem('medStudyData_v21')) {
+            document.getElementById('appRoot').innerHTML = localStorage.getItem('medStudyData_v21');
         }
         changePage(0);
         showTab('tab-chat');
+        initCanvases();
     };
 
     document.addEventListener('input', function() {
-        if(isEditing) localStorage.setItem('medStudyData_v18', document.getElementById('appRoot').innerHTML);
+        if(isEditing) localStorage.setItem('medStudyData_v21', document.getElementById('appRoot').innerHTML);
     });
 
     function resetData() {
         if(confirm("초기화하시겠습니까?")) {
-            localStorage.removeItem('medStudyData_v18');
+            localStorage.removeItem('medStudyData_v21');
             location.reload();
         }
     }
 
-    // [탭 제어]
+    // [족보 뷰 토글]
+    function toggleJokboList() {
+        isJokboExpanded = !isJokboExpanded;
+        const btn = document.getElementById('jokboExpandBtn');
+        btn.innerText = isJokboExpanded ? "🔼 현재 문제만 보기" : "🔽 전체 문제 보기";
+        // 화면 갱신
+        const pageNum = pages[currentPageIdx].replace('p', '');
+        syncRightPanel(pageNum);
+    }
+
+    // [싱크 & 표시 로직 수정]
+    function syncRightPanel(pageNum) {
+        // 기존 하이라이트 제거
+        document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => {
+            el.classList.remove('active-sync'); el.classList.remove('active-context-bg');
+        });
+
+        // 1. 족보 처리
+        const jokboCards = document.querySelectorAll('.jokbo-card');
+        let hasMatch = false;
+        
+        jokboCards.forEach(card => {
+            const isMatch = card.getAttribute('data-page') === pageNum;
+            if (isMatch) {
+                card.classList.add('active-sync');
+                hasMatch = true;
+            }
+
+            if (isJokboExpanded) {
+                // 전체 보기 모드: 다 보여줌
+                card.style.display = 'block';
+                // 매칭된 것만 스크롤
+                if (isMatch && document.getElementById('tab-jokbo').classList.contains('active')) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                // 현재 문제만 보기 모드: 매칭된 것만 show
+                if (isMatch) card.style.display = 'block';
+                else card.style.display = 'none';
+            }
+        });
+        
+        // 매칭된 문제가 없으면 안내 메시지 (선택 사항)
+        // if (!hasMatch && !isJokboExpanded) { ... }
+
+        // 2. 스크립트 & 채팅 (기존과 동일하게 스크롤)
+        document.querySelectorAll('.script-segment').forEach(el => {
+            if(el.getAttribute('data-page') === pageNum) {
+                el.classList.add('active-sync');
+                if(document.getElementById('tab-script').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+        document.querySelectorAll('.msg-group').forEach(el => {
+            if(el.getAttribute('data-page') === pageNum) {
+                el.querySelector('.ai-msg').classList.add('active-context-bg');
+                if(document.getElementById('tab-chat').classList.contains('active')) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    // [이하 기존 기능 유지]
+    function initCanvases() {
+        document.querySelectorAll('.drawing-canvas').forEach(canvas => {
+            canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
+            const context = canvas.getContext('2d'); context.lineCap = 'round'; context.lineJoin = 'round';
+            canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing);
+        });
+    }
+    function setTool(tool) {
+        currentTool = tool;
+        document.querySelectorAll('.pen-btn').forEach(b => b.classList.remove('active'));
+        const icons = {'cursor': '👆', 'pen': '✏️', 'highlighter': '🖍️', 'eraser': '🧹'};
+        const btns = Array.from(document.querySelectorAll('.pen-btn'));
+        const targetBtn = btns.find(b => b.innerText.includes(icons[tool]));
+        if(targetBtn) targetBtn.classList.add('active');
+        const pdfContainer = document.getElementById('pdfContainer');
+        if (tool === 'cursor') pdfContainer.classList.remove('pen-mode'); else pdfContainer.classList.add('pen-mode');
+    }
+    function setColor(color) {
+        currentColor = color;
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        const dots = Array.from(document.querySelectorAll('.color-dot'));
+        const targetDot = dots.find(d => d.style.background.includes(color.replace('#','')));
+        if(targetDot || (color==='black' && dots[0])) (targetDot || dots[0]).classList.add('active');
+    }
+    function startDrawing(e) {
+        if (currentTool === 'cursor') return;
+        isDrawing = true;
+        const canvas = e.target; ctx = canvas.getContext('2d');
+        const rect = canvas.getBoundingClientRect(); lastX = e.clientX - rect.left; lastY = e.clientY - rect.top;
+        ctx.beginPath(); ctx.moveTo(lastX, lastY);
+        if (currentTool === 'pen') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentColor; ctx.lineWidth = 2; }
+        else if (currentTool === 'highlighter') { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = currentColor === '#d32f2f' ? 'rgba(255, 235, 59, 0.4)' : 'rgba(0, 255, 0, 0.3)'; ctx.lineWidth = 15; }
+        else if (currentTool === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 20; }
+    }
+    function draw(e) { if (!isDrawing) return; const rect = e.target.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; ctx.lineTo(x, y); ctx.stroke(); [lastX, lastY] = [x, y]; }
+    function stopDrawing() { isDrawing = false; if(ctx) ctx.closePath(); }
+    function clearCanvas() { const activePage = document.querySelector('.pdf-page.active'); const canvas = activePage.querySelector('canvas'); const context = canvas.getContext('2d'); context.clearRect(0, 0, canvas.width, canvas.height); }
+
     function showTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
-        const targetTab = document.getElementById(tabId);
-        targetTab.classList.add('active');
-        targetTab.style.display = 'flex';
-        
+        const targetTab = document.getElementById(tabId); targetTab.classList.add('active'); targetTab.style.display = 'flex';
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
         const tabIndex = ['tab-chat', 'tab-jokbo', 'tab-script'].indexOf(tabId);
         if(document.querySelectorAll('.tab')[tabIndex]) document.querySelectorAll('.tab')[tabIndex].classList.add('active');
-        
         const player = document.getElementById('audioPlayer');
         if (tabId === 'tab-script') player.style.display = 'flex'; else player.style.display = 'none';
-
         const pageNum = pages[currentPageIdx].replace('p', '');
         setTimeout(() => syncRightPanel(pageNum), 50);
     }
@@ -297,12 +424,10 @@
         else { box.style.display = 'block'; btn.innerHTML = '🔼 분석 닫기'; }
     }
 
-    // [편집 모드]
     function toggleEditMode() {
         isEditing = !isEditing;
         const btn = document.getElementById('editToggleBtn');
         const body = document.body;
-        
         if(isEditing) {
             btn.classList.add('active'); btn.innerHTML = '💾'; body.classList.add('editing-mode');
             const targets = document.querySelectorAll('.msg-group, .jokbo-card, .script-segment');
@@ -311,7 +436,6 @@
         } else {
             btn.classList.remove('active'); btn.innerHTML = '✎'; body.classList.remove('editing-mode');
             document.querySelectorAll('.item-control-panel').forEach(el => el.remove());
-            
             document.querySelectorAll('.msg-group, .jokbo-card, .script-segment').forEach(el => {
                 el.removeAttribute('draggable');
                 el.removeEventListener('dragstart', handleSortStart);
@@ -322,9 +446,8 @@
                     el.setAttribute('ondragstart', "drag(event, 'jokbo')");
                 }
             });
-
             document.querySelectorAll('.editable-target').forEach(el => el.contentEditable = "false");
-            localStorage.setItem('medStudyData_v18', document.getElementById('appRoot').innerHTML);
+            localStorage.setItem('medStudyData_v21', document.getElementById('appRoot').innerHTML);
             const pageNum = pages[currentPageIdx].replace('p', '');
             syncRightPanel(pageNum);
         }
@@ -345,7 +468,6 @@
         el.insertBefore(panel, el.firstChild);
     }
 
-    // [클릭 싱크]
     function handleClickSync(el) {
         if (isEditing) return;
         const targetPage = el.getAttribute('data-page');
@@ -360,12 +482,14 @@
             document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0);
             document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1);
             syncRightPanel(targetPage);
+            
+            const canvas = document.getElementById(newPageId).querySelector('canvas');
+            if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; }
             el.classList.add('active-context-bg');
             setTimeout(() => el.classList.remove('active-context-bg'), 500);
         }
     }
 
-    // [정렬 드래그]
     function enableSortDrag(handle) {
         const item = handle.closest('.msg-group, .jokbo-card, .script-segment');
         item.setAttribute('draggable', 'true');
@@ -398,34 +522,19 @@
         }
     }
 
-    // [드래그 앤 드롭 (핵심 로직)]
     function drag(ev, type) { 
-        // 1. 텍스트 선택 드래그인지 확인 (우선순위 1)
         const selection = window.getSelection().toString();
-        if (selection && selection.length > 0) { 
-            ev.dataTransfer.setData("type", 'text'); 
-            return; 
-        }
-        
-        // 2. 핀 아이콘(핸들) 드래그인지 확인 (우선순위 2)
+        if (selection && selection.length > 0) { ev.dataTransfer.setData("type", 'text'); return; }
         if (type === 'ai') {
-            // 부모 bubble을 찾아서 텍스트 가져오기
             const bubble = ev.target.closest('.ai-msg');
-            const text = bubble.innerText.replace("📌", "").trim(); // 핀 아이콘 텍스트 제거
+            const text = bubble.innerText.replace("📌", "").trim();
             ev.dataTransfer.setData("text", text); 
             ev.dataTransfer.setData("type", 'ai_bubble');
             return;
         }
-
-        // 3. 족보 카드 드래그
-        if(type === 'jokbo') { 
-            ev.dataTransfer.setData("text", ev.target.innerText); 
-            ev.dataTransfer.setData("type", 'jokbo'); 
-        }
+        if(type === 'jokbo') { ev.dataTransfer.setData("text", ev.target.innerText); ev.dataTransfer.setData("type", 'jokbo'); }
     }
-    
     function allowDrop(ev) { ev.preventDefault(); }
-    
     function drop(ev) {
         ev.preventDefault();
         if (ev.dataTransfer.getData('sort-type')) return;
@@ -442,14 +551,11 @@
             const qLine = textData.split('\n').find(l => l.includes('Q.')) || textData;
             note.innerHTML = `📌 <strong>족보 연결</strong><br>${qLine.substring(0, 35)}...`;
         } else if (type === 'ai_bubble') {
-            // 말풍선 전체 드래그
             note.innerHTML = `📌 <strong>AI 메모 (전체)</strong><br>${textData.substring(0, 30)}...`;
         } else {
-            // 텍스트 선택 드래그
             if (!textData) return;
             note.innerHTML = `📌 <strong>AI 메모 (발췌)</strong><br>${textData.substring(0, 30)}...`;
         }
-        
         note.style.left = (ev.clientX - rect.left) + "px"; 
         note.style.top = (ev.clientY - rect.top) + "px";
         if(isEditing) note.contentEditable = "true";
@@ -464,17 +570,8 @@
         const item = btn.closest('.msg-group, .jokbo-card, .script-segment');
         const type = item.classList.contains('msg-group') ? 'chat' : item.classList.contains('jokbo-card') ? 'jokbo' : 'script';
         let newItem = item.cloneNode(true);
-        if(type === 'chat') { 
-            newItem.querySelector('.user-msg').innerText = '질문'; 
-            const aiMsg = newItem.querySelector('.ai-msg');
-            aiMsg.childNodes[0].nodeValue = "답변"; // 텍스트만 변경 (핀 유지)
-        }
-        else if(type === 'jokbo') { 
-            newItem.querySelector('.q-body').innerText = '문제';
-            const box = newItem.querySelector('.analysis-box');
-            if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; }
-            newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석';
-        }
+        if(type === 'chat') { newItem.querySelector('.user-msg').innerText = '질문'; const aiMsg = newItem.querySelector('.ai-msg'); aiMsg.childNodes[0].nodeValue = "답변"; }
+        else if(type === 'jokbo') { newItem.querySelector('.q-body').innerText = '문제'; const box = newItem.querySelector('.analysis-box'); if(box) { box.style.display = 'none'; box.querySelector('.editable-target').innerText = '분석 내용'; } newItem.querySelector('.analyze-btn').innerText = '🤖 AI 출제분석'; }
         else { newItem.querySelector('.script-text').innerText = '내용'; }
         item.after(newItem);
         newItem.querySelector('.item-control-panel').remove();
@@ -495,24 +592,8 @@
         document.querySelector('.nav-prev').classList.toggle('disabled', currentPageIdx === 0);
         document.querySelector('.nav-next').classList.toggle('disabled', currentPageIdx === pages.length - 1);
         syncRightPanel(pageNum);
-    }
-
-    function syncRightPanel(pageNum) {
-        document.querySelectorAll('.active-sync, .active-context-bg').forEach(el => {
-            el.classList.remove('active-sync'); el.classList.remove('active-context-bg');
-        });
-        const targets = document.querySelectorAll(`[data-page="${pageNum}"]`);
-        targets.forEach(el => {
-            if(el.classList.contains('jokbo-card') && document.getElementById('tab-jokbo').classList.contains('active')) {
-                el.classList.add('active-sync'); el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            if(el.classList.contains('script-segment') && document.getElementById('tab-script').classList.contains('active')) {
-                el.classList.add('active-sync'); el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            if(el.classList.contains('msg-group') && document.getElementById('tab-chat').classList.contains('active')) {
-                el.querySelector('.ai-msg').classList.add('active-context-bg'); el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        });
+        const canvas = document.getElementById(newPageId).querySelector('canvas');
+        if(canvas.width === 0) { canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight; }
     }
 
     function focusChat(pageNum) { showTab('tab-chat'); changePage(0); changePage(pageNum - 13); }
